@@ -20,18 +20,18 @@ jobs:
       
       - name: Read Unity project version
         run: |
-        echo "Project requires:"
-        cat ProjectSettings/ProjectVersion.txt || true
+          echo "Project requires:"
+          cat ProjectSettings/ProjectVersion.txt || true
       
       - name: Install Unity Editor (headless)
         run: |
-        set -e
-        URL="https://download.unity3d.com/download_unity/${UNITY_REV}/Unity.tar.xz"
-        echo "Downloading $URL"
-        curl -L "$URL" -o unity.tar.xz
-        sudo mkdir -p /opt/unity
-        sudo tar -xJf unity.tar.xz -C /opt/unity
-        echo "UNITY=/opt/unity/Editor/Unity" >> $GITHUB_ENV
+          set -e
+          URL="https://download.unity3d.com/download_unity/${UNITY_REV}/Unity.tar.xz"
+          echo "Downloading $URL"
+          curl -L "$URL" -o unity.tar.xz
+          sudo mkdir -p /opt/unity
+          sudo tar -xJf unity.tar.xz -C /opt/unity
+          echo "UNITY=/opt/unity/Editor/Unity" >> $GITHUB_ENV
 
       - name: Activate Unity license
         run: |
