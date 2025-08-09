@@ -1,62 +1,152 @@
-name: Unity CICD
+name: UnityPipeline
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
   workflow_dispatch:
+    inputs:
+      target_platform:
+        description: 'Target Platform'
+        required: true
+        default: 'StandaloneWindows64'
+        type: choice
+        options:
+          - StandaloneWindows64
+          - StandaloneLinux64
+          - WebGL
+      run_tests:
+        description: 'Run PlayMode tests'
+        required: true
+        default: true
+        type: boolean
+      run_build:
+        description: 'Build project'
+        required: true
+        default: true
+        type: boolean
+      create_release:
+        description: 'Create GitHub release'
+        required: true
+        default: true
+        type: boolean
+
+env:
+  PROJECT_PATH: .
+  BUILD_NAME: UnityBuild
 
 jobs:
-  test-editmode:
+  unity_ci:
+    name: Tests, Build, Artifacts, Release
     runs-on: ubuntu-latest
-    env:
-      UNITY_VERSION: 6000.0.37f1
-      UNITY_REV: 090b7797214c
-      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          lfs: true
+          fetch-depth: 0
       
       - name: Read Unity project version
+        id: unity
+        shell: bash
         run: |
-          echo "Project requires:"
-          cat ProjectSettings/ProjectVersion.txt || true
+          ver=$(grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' "$PROJECT_PATH/ProjectSettings/ProjectVersion.txt" | head -n1 || true)
+          echo "version=${ver}" >> $GITHUB_OUTPUT
       
-      - name: Install Unity Editor (headless)
-        run: |
-          set -e
-          URL="https://download.unity3d.com/download_unity/${UNITY_REV}/Unity.tar.xz"
-          echo "Downloading $URL"
-          curl -L "$URL" -o unity.tar.xz
-          sudo mkdir -p /opt/unity
-          sudo tar -xJf unity.tar.xz -C /opt/unity
-          echo "UNITY=/opt/unity/Editor/Unity" >> $GITHUB_ENV
+      - name: Cache Library
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PROJECT_PATH }}/Library
+          key: Library-${{ runner.os }}-Unity${{ steps.unity.outputs.version }}-${{ hashFiles(format('{0}/Packages/manifest.json', env.PROJECT_PATH)) }}-${{ hashFiles(format('{0}/Packages/packages-lock.json', env.PROJECT_PATH)) }}
+          restore-keys: |
+            Library-${{ runner.os }}-Unity${{ steps.unity.outputs.version }}-
 
-      - name: Activate Unity license
+      - name: Set mode flags
+        id: mode
+        shell: bash
         run: |
-          mkdir -p ~/.local/share/unity3d/Unity/
-          if echo "$UNITY_LICENSE" | base64 -d >/dev/null 2>&1; then
-            echo "$UNITY_LICENSE" | base64 -d > ~/.local/share/unity3d/Unity/Unity_lic.ulf
-          else
-            echo "$UNITY_LICENSE" > ~/.local/share/unity3d/Unity/Unity_lic.ulf
+          # Defaults: PR = tests only; push main = tests+build; manual = use inputs
+          run_tests="true"
+          run_build="false"
+          create_release="false"
+          target_platform="StandaloneWindows64"
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            run_build="false"
+          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+            run_build="true"
+            create_release="true"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            run_tests="${{ github.event.inputs.run_tests }}"
+            run_build="${{ github.event.inputs.run_build }}"
+            create_release="${{ github.event.inputs.create_release }}"
+            target_platform="${{ github.event.inputs.target_platform }}"
           fi
 
-      - name: Clean workspace
-        run: |
-          rm -rf Library artifacts
-          mkdir -p artifacts
-      
-      - name: Run EditMode tests (JUnit)
-        run: |
-          $UNITY -batchmode -nographics -quit \
-            -projectPath . \
-            -runTests \
-            -testPlatform EditMode \
-            -testResults "artifacts/test-editmode.xml"
-      
-      - name: Upload test results
+          echo "run_tests=${run_tests}"        >> $GITHUB_OUTPUT
+          echo "run_build=${run_build}"        >> $GITHUB_OUTPUT
+          echo "create_release=${create_release}" >> $GITHUB_OUTPUT
+          echo "target_platform=${target_platform}" >> $GITHUB_OUTPUT
+
+      - name: Run PlayMode Tests
+        if: steps.mode.outputs.run_tests == 'true'
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        with:
+          projectPath: ${{ env.PROJECT_PATH }}
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          testMode: PlayMode
+          customParameters: -enableCodeCoverage -coverageResultsPath ./Coverage -coverageOptions enableCyclomaticComplexity;generateHtmlReport
+
+      - name: Upload Test Results (XML, logs, coverage)
+        if: always() && steps.mode.outputs.run_tests == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: test-editmode-results
-          path: artifacts/test-editmode.xml
+          name: unity-test-results
+          path: |
+            **/TestResults/**/*.xml
+            **/Logs/**
+            Coverage/**
+          retention-days: 14
+      
+      - name: Publish Test Results
+        if: always() && steps.mode.outputs.run_tests == 'true'
+        uses: dorny/test-reporter@v1
+        with:
+          name: Unity PlayMode Tests
+          path: '**/TestResults/**/*.xml'
+          reporter: java-junit
+          fail-on-error: false
+      
+      - name: Build
+        if: steps.mode.outputs.run_build == 'true'
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        with:
+          projectPath: ${{ env.PROJECT_PATH }}
+          targetPlatform: ${{ steps.mode.outputs.target_platform }}
+          buildName: ${{ env.BUILD_NAME }}
+      
+      - name: Upload Build Artifact
+        if: success() && steps.mode.outputs.run_build == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ steps.mode.outputs.target_platform }}
+          path: build/**/*
+          retention-days: 30
+      
+      - name: Create GitHub Release
+        if: success() && steps.mode.outputs.run_build == 'true' && steps.mode.outputs.create_release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: unity-build-${{ github.run_number }}
+          name: Unity Build ${{ github.run_number }}
+          body: |
+            Automated Unity build from commit ${{ github.sha }}
+            **Platform:** ${{ steps.mode.outputs.target_platform }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
