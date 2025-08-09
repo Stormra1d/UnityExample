@@ -1,0 +1,62 @@
+name: Unity CICD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test-editmode:
+    runs-on: ubuntu-latest
+    env:
+      UNITY_VERSION: 6000.0.37f1
+      UNITY_REV: 090b7797214c
+      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Read Unity project version
+        run: |
+        echo "Project requires:"
+        cat ProjectSettings/ProjectVersion.txt || true
+      
+      - name: Install Unity Editor (headless)
+        run: |
+        set -e
+        URL="https://download.unity3d.com/download_unity/${UNITY_REV}/Unity.tar.xz"
+        echo "Downloading $URL"
+        curl -L "$URL" -o unity.tar.xz
+        sudo mkdir -p /opt/unity
+        sudo tar -xJf unity.tar.xz -C /opt/unity
+        echo "UNITY=/opt/unity/Editor/Unity" >> $GITHUB_ENV
+
+      - name: Activate Unity license
+        run: |
+          mkdir -p ~/.local/share/unity3d/Unity/
+          if echo "$UNITY_LICENSE" | base64 -d >/dev/null 2>&1; then
+            echo "$UNITY_LICENSE" | base64 -d > ~/.local/share/unity3d/Unity/Unity_lic.ulf
+          else
+            echo "$UNITY_LICENSE" > ~/.local/share/unity3d/Unity/Unity_lic.ulf
+          fi
+
+      - name: Clean workspace
+        run: |
+          rm -rf Library artifacts
+          mkdir -p artifacts
+      
+      - name: Run EditMode tests (JUnit)
+        run: |
+          $UNITY -batchmode -nographics -quit \
+            -projectPath . \
+            -runTests \
+            -testPlatform EditMode \
+            -testResults "artifacts/test-editmode.xml"
+      
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-editmode-results
+          path: artifacts/test-editmode.xml
