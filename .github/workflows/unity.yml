@@ -96,14 +96,29 @@ jobs:
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
 
+      - name: Hard-unset Unity activation envs
+        run: |
+          echo "UNITY_SERIAL="   >> "$GITHUB_ENV"
+          echo "UNITY_EMAIL="    >> "$GITHUB_ENV"
+          echo "UNITY_PASSWORD=" >> "$GITHUB_ENV"
+
+      - name: Detect UNITY_* envs
+        run: |
+          for v in UNITY_LICENSE UNITY_SERIAL UNITY_EMAIL UNITY_PASSWORD; do
+            if [[ -v $v ]]; then
+              echo "$v is SET (len=${#v})"
+            else
+              echo "$v is NOT set"
+            fi
+          done
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+
       - name: Run PlayMode Tests
         if: steps.mode.outputs.run_tests == 'true'
         uses: game-ci/unity-test-runner@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_SERIAL:   ''
-          UNITY_EMAIL:    ''
-          UNITY_PASSWORD: ''
         with:
           projectPath: ${{ env.PROJECT_PATH }}
           githubToken: ${{ secrets.GITHUB_TOKEN }}
