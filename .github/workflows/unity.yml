@@ -100,8 +100,6 @@ jobs:
       - name: Hard-unset Unity activation envs
         run: |
           echo "UNITY_SERIAL="   >> "$GITHUB_ENV"
-          echo "UNITY_EMAIL="    >> "$GITHUB_ENV"
-          echo "UNITY_PASSWORD=" >> "$GITHUB_ENV"
 
       - name: Detect UNITY_* envs
         run: |
