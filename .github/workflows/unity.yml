@@ -36,6 +36,8 @@ env:
   PROJECT_PATH: .
   BUILD_NAME: UnityBuild
   UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+  UNITY_EMAIL:    ${{ secrets.UNITY_EMAIL }}
+  UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 
 jobs:
   unity_ci:
