@@ -35,6 +35,7 @@ on:
 env:
   PROJECT_PATH: .
   BUILD_NAME: UnityBuild
+  UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
 
 jobs:
   unity_ci:
@@ -119,8 +120,6 @@ jobs:
       - name: Run PlayMode Tests
         if: steps.mode.outputs.run_tests == 'true'
         uses: game-ci/unity-test-runner@v4
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
           projectPath: ${{ env.PROJECT_PATH }}
           githubToken: ${{ secrets.GITHUB_TOKEN }}
@@ -150,8 +149,6 @@ jobs:
       - name: Build
         if: steps.mode.outputs.run_build == 'true'
         uses: game-ci/unity-builder@v4
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
           projectPath: ${{ env.PROJECT_PATH }}
           targetPlatform: ${{ steps.mode.outputs.target_platform }}
