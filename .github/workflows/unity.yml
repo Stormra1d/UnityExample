@@ -104,9 +104,11 @@ jobs:
 
       - name: Detect UNITY_* envs
         run: |
+          set -euo pipefail
           for v in UNITY_LICENSE UNITY_SERIAL UNITY_EMAIL UNITY_PASSWORD; do
             if [[ -v $v ]]; then
-              echo "$v is SET (len=${#v})"
+              eval "val=\${$v}"
+              echo "$v is SET (len=${#val})"
             else
               echo "$v is NOT set"
             fi
