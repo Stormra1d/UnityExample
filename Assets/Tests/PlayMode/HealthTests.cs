@@ -49,10 +49,11 @@ public class HealthTests
     [UnityTest]
     public IEnumerator Die_DestroysGameObject_WhenEnemyDies()
     {
+        var gameObject = health.gameObject;
         health.TakeDamage(health.maxHealth);
         yield return null;
 
-        Assert.IsNull(health.gameObject);
+        Assert.IsTrue(gameObject == null);
     }
 
     [UnityTest]

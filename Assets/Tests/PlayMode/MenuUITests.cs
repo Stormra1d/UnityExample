@@ -1,9 +1,10 @@
 using System.Collections;
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.LowLevel;
-using UnityEngine.InputSystem.Utilities;
+using UnityEngine.InputSystem.Users;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
@@ -75,13 +76,39 @@ public class MenuUITests
         SceneManager.LoadScene("TestGame");
         yield return null;
 
+        var playerInput = Object.FindAnyObjectByType<PlayerInput>();
+        Assert.IsNotNull(playerInput, "PlayerInput not found");
+
         var keyboard = Keyboard.current ?? InputSystem.AddDevice<Keyboard>();
+        var mouse = Mouse.current ?? InputSystem.AddDevice<Mouse>();
+
+        playerInput.user.UnpairDevices();
+        InputUser.PerformPairingWithDevice(keyboard, playerInput.user);
+        InputUser.PerformPairingWithDevice(mouse, playerInput.user);
+        playerInput.SwitchCurrentControlScheme(keyboard, mouse);
+
         InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.Escape));
         InputSystem.Update();
 
         yield return null;
 
+        InputSystem.QueueStateEvent(keyboard, new KeyboardState());
+        InputSystem.Update();
+
+        yield return null;
+
         var pauseMenu = Object.FindAnyObjectByType<PauseMenuManager>();
+
+        var actionRef = pauseMenu.pauseAction;
+        Assert.IsNotNull(actionRef, "PauseMenuManager.pauseAction is not assigned in TestGame scene");
+
+        var a = actionRef.action;
+        Assert.IsTrue(a.enabled, "Pause action is not enabled (OnEnable may not have run)");
+
+        Debug.Log("PAUSE bindings:\n" + string.Join("\n", a.bindings.Select(b => $"{b.groups} | {b.path}")));
+        Debug.Log("PAUSE controls resolved:\n" + string.Join("\n", a.controls.Select(c => c.path)));
+
+
         Assert.IsNotNull(pauseMenu, "PauseMenuManager should be present");
         Assert.IsTrue(pauseMenu.pauseMenuUI.activeSelf, "Pause Menu UI should be active after ESC");
         Assert.AreEqual(0f, Time.timeScale, "Time should be stopped when paused");
@@ -99,14 +126,11 @@ public class MenuUITests
         var rectTransform = resumeButtonGameObject.GetComponent<RectTransform>();
 
         var canvas = Object.FindAnyObjectByType<Canvas>();
-        Camera uiCamera = (canvas != null && canvas.renderMode == RenderMode.ScreenSpaceCamera) ? canvas.worldCamera : Camera.main;
-        Assert.IsNotNull(uiCamera, "Camera should be active");
+        Camera uiCamera = (canvas != null && canvas.renderMode == RenderMode.ScreenSpaceCamera) ? canvas.worldCamera : null;
 
-        Vector2 screenPosition = rectTransform.position;
+        Vector2 screenPosition = RectTransformUtility.WorldToScreenPoint(uiCamera, rectTransform.position);
 
         Assert.IsNotNull(Object.FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>(), "Event System should be present");
-
-        var mouse = InputSystem.AddDevice<Mouse>();
 
         InputSystem.QueueStateEvent(mouse, new MouseState { position = screenPosition });
         InputSystem.Update();
@@ -135,6 +159,11 @@ public class MenuUITests
 
         var keyboard = Keyboard.current ?? InputSystem.AddDevice<Keyboard>();
         InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.P));
+        InputSystem.Update();
+
+        yield return null;
+
+        InputSystem.QueueStateEvent(keyboard, new KeyboardState());
         InputSystem.Update();
 
         yield return null;

@@ -62,7 +62,7 @@ public class PauseMenuManager : MonoBehaviour
         pauseMenuUI.SetActive(true);
 
         UnlockCursor();
-        DisablePlayerInput();
+        if (firstPersonController) firstPersonController.enabled = false;
     }
 
     public void ResumeGame()
@@ -73,7 +73,7 @@ public class PauseMenuManager : MonoBehaviour
         Time.timeScale = 1f;
 
         LockCursor();
-        EnablePlayerInput();
+        if (firstPersonController) firstPersonController.enabled = true;
     }
 
     public void QuitToMainMenu()
