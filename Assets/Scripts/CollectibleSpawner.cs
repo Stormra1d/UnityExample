@@ -20,7 +20,7 @@ public class CollectibleSpawner : MonoBehaviour
             {
                 bool placed = false;
 
-                for (int a = 0; a < 10; a++)
+                for (int a = 0; a < 50; a++)
                 {
                     RaycastHit hit;
                     Vector3 rayStart = spawnPoint + Vector3.up * 5f;
@@ -46,7 +46,7 @@ public class CollectibleSpawner : MonoBehaviour
                         }
                     }
 
-                    NavMeshHelper.GetRandomNavMeshPosition(transform.position, collectibleSpawnRadius, out spawnPoint);
+                    NavMeshHelper.GetRandomNavMeshPosition(transform.position, collectibleSpawnRadius * 1.2f, out spawnPoint);
                 }
                 if (!placed)
                 {

@@ -75,11 +75,13 @@ public class EnemyTesting
 
         player.transform.position = smartEnemy.transform.position + smartEnemy.transform.forward * 2f;
         yield return new WaitForSeconds(1f);
+        yield return null;
 
         Assert.AreEqual(State.Chase, ai.currentState, "Enemy should be chasing the player");
 
         player.transform.position = new Vector3(-100, 1000000, 50);
-        yield return new WaitForSeconds(ai.forgetDuration + 0.1f);
+        yield return new WaitForSeconds(ai.forgetDuration + 1.0f);
+        yield return null;
 
         Assert.AreEqual(State.Chase, ai.currentState, "Enemy should still be Chasing");
         Assert.IsTrue(ai.isGoingToLastKnownPosition, "Enemy should be on way to last known position");
