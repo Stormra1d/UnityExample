@@ -8,7 +8,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.UIElements;
 
-public class StressTests : BasePlayModeTest
+public class StressTests
 {
     private List<GameObject> spawnedEnemies = new();
     private List<GameObject> spawnedProjectiles = new();

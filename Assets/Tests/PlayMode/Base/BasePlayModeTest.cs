@@ -56,7 +56,6 @@ public abstract class BasePlayModeTest
         TryUnload("MainMenu");
         TryUnload("TestGame");
         TryUnload("TestMainMenu");
-        TryUnload("PerformanceTestScene");
 
         Time.timeScale = _prevTimeScale;
         PlayerPrefs.DeleteAll();
