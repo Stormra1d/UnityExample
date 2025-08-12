@@ -8,7 +8,7 @@ using System.Collections.Generic;
 /// <summary>
 /// Lengthy setup? Idk, early tests are much different than my later tests. Standardize!
 /// </summary>
-public class WeaponAmmoSystemTest
+public class WeaponAmmoSystemTest : BasePlayModeTest
 {
 
     GameObject playerGameObject;
