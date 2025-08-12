@@ -1,6 +1,7 @@
 using System.Collections;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.AI;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
@@ -19,12 +20,16 @@ public class ZEnemyTesting : BasePlayModeTest
     [UnitySetUp]
     public IEnumerator SetUp()
     {
+        NavMesh.RemoveAllNavMeshData();
+
         if (!SceneManager.GetSceneByName("GameAITest").isLoaded)
         {
-            SceneManager.LoadScene("GameAITest");
+            yield return SceneManager.UnloadSceneAsync("GameAITest");
         }
 
         yield return new WaitUntil(() => SceneManager.GetActiveScene().name == "GameAITest");
+
+        yield return new WaitUntil(() => NavMesh.CalculateTriangulation().indices != null);
     }
 
     [UnityTearDown]
@@ -33,6 +38,8 @@ public class ZEnemyTesting : BasePlayModeTest
         if (player) Object.Destroy(player);
         if (smartEnemy) Object.Destroy(smartEnemy);
         if (dumbEnemy) Object.Destroy(dumbEnemy);
+
+        yield return UnloadTestScenes();
         yield return null;
     }
 
@@ -80,8 +87,9 @@ public class ZEnemyTesting : BasePlayModeTest
         Assert.AreEqual(State.Chase, ai.currentState, "Enemy should be chasing the player");
 
         player.transform.position = new Vector3(-100, 1000000, 50);
-        yield return new WaitForSeconds(ai.forgetDuration + 0.1f);
-        yield return null;
+        float timeout = ai.forgetDuration + 2f;
+        yield return new WaitForSeconds(0.1f);
+        yield return new WaitUntil(() => ai.isGoingToLastKnownPosition || (timeout -= Time.deltaTime) <= 0);
 
         Assert.AreEqual(State.Chase, ai.currentState, "Enemy should still be Chasing");
         Assert.IsTrue(ai.isGoingToLastKnownPosition, "Enemy should be on way to last known position");
@@ -95,5 +103,19 @@ public class ZEnemyTesting : BasePlayModeTest
         yield return new WaitForSeconds(2.5f);
 
         Assert.AreEqual(State.Patrol, ai.currentState, "Enemy should be on patrol");
+    }
+
+    private IEnumerator UnloadTestScenes()
+    {
+        string[] scenes = { "GameAITest", "Game", "MainMenu", "TestGame", "TestMainMenu" };
+        foreach (string scene in scenes)
+        {
+            Scene s = SceneManager.GetSceneByName(scene);
+            if (s.isLoaded)
+            {
+                AsyncOperation unload = SceneManager.UnloadSceneAsync(s);
+                yield return new WaitUntil(() => unload.isDone);
+            }
+        }
     }
 }

@@ -29,6 +29,11 @@ on:
         default: true
         type: boolean
 
+permissions:
+  contents: write
+  pull-requests: write
+  checks: write
+
 env:
   PROJECT_PATH: .
   BUILD_NAME: UnityBuild
