@@ -146,7 +146,7 @@ jobs:
         with:
           name: Unity PlayMode Tests
           path: 'artifacts/*.xml'
-          reporter: nunit
+          reporter: dotnet-nunit
           fail-on-error: false
       
       - name: Build
