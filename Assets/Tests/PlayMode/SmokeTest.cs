@@ -84,6 +84,8 @@ public class SmokeTest
             playerGameObject.GetComponent<MonoBehaviour>()?.StopAllCoroutines();
         }
 
+        if (miscSpawner != null) miscSpawner.enabled = false;
+
         Object.DestroyImmediate(spawnerGameObject);
         Object.DestroyImmediate(healthPackPrefab);
         Object.DestroyImmediate(playerGameObject);
