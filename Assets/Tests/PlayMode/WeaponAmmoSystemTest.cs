@@ -21,7 +21,7 @@ public class WeaponAmmoSystemTest : BasePlayModeTest
     TextMeshProUGUI ammoText;
 
     [UnitySetUp]
-    public void Setup()
+    public IEnumerator Setup()
     {
         var cameraGameObject = new GameObject("Camera");
         camera  = cameraGameObject.AddComponent<Camera>();
@@ -51,24 +51,33 @@ public class WeaponAmmoSystemTest : BasePlayModeTest
         weapon.isReloading = false;
         weapon.isShooting = false;
 
-        uiGameobject = new GameObject("AmmoUI");
+        uiGameobject = new GameObject("AmmoCanvas");
+        var canvas = uiGameobject.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        uiGameobject.AddComponent<UnityEngine.UI.CanvasScaler>();
+        uiGameobject.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+
+        var textGO = new GameObject("AmmoText");
+        textGO.transform.SetParent(uiGameobject.transform, false);
+        ammoText = textGO.AddComponent<TextMeshProUGUI>();
+
         ammoUIManager = uiGameobject.AddComponent<AmmoUIManager>();
-        ammoText = uiGameobject.AddComponent<TextMeshProUGUI>();
         ammoUIManager.ammo = ammoText;
         ammoUIManager.currentWeapon = weapon;
+
+        yield return null;
     }
 
     [UnityTearDown]
-    public void Teardown()
+    public IEnumerator Teardown()
     {
         Object.DestroyImmediate(uiGameobject);
         Object.DestroyImmediate(playerGameObject);
-        Object.DestroyImmediate(ammoUIManager);
-        Object.DestroyImmediate(ammoText);
-        Object.DestroyImmediate(weapon);
         Object.DestroyImmediate(bulletPrefab);
         Object.DestroyImmediate(bulletSpawnGameObject);
         Object.DestroyImmediate(camera.gameObject);
+
+        yield return null;
     }
 
     [UnityTest]

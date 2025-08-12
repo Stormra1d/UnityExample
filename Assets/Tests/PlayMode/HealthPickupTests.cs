@@ -12,22 +12,32 @@ public class HealthPickupTests : BasePlayModeTest
 {
     GameObject playerGameObject;
     Health playerHealth;
+
+    GameObject canvasGO;
     PlayerHealthUI healthUI;
     TextMeshProUGUI hpText;
     GameObject healthPackGameObject;
     HealthPack healthPack;
 
     [UnitySetUp]
-    public void Setup()
+    public IEnumerator Setup()
     {
         playerGameObject = new GameObject("Player");
         playerGameObject.tag = "Player";
         playerHealth = playerGameObject.AddComponent<Health>();
         playerHealth.maxHealth = 100f;
 
-        var canvasGameObject = new GameObject("Canvas");
-        healthUI = canvasGameObject.AddComponent<PlayerHealthUI>();
-        hpText = canvasGameObject.AddComponent<TextMeshProUGUI>();
+        canvasGO = new GameObject("Canvas");
+        var canvas = canvasGO.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvasGO.AddComponent<UnityEngine.UI.CanvasScaler>();
+        canvasGO.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+
+        var textGO = new GameObject("HPText");
+        textGO.transform.SetParent(canvasGO.transform, false);
+        hpText = textGO.AddComponent<TMPro.TextMeshProUGUI>();
+
+        healthUI = canvasGO.AddComponent<PlayerHealthUI>();
         healthUI.playerHealth = playerHealth;
         healthUI.hpText = hpText;
 
@@ -35,15 +45,18 @@ public class HealthPickupTests : BasePlayModeTest
         healthPackGameObject.AddComponent<BoxCollider>().isTrigger = true;
         healthPack = healthPackGameObject.AddComponent<HealthPack>();
         healthPack.healAmount = 25f;
+
+        yield return null;
     }
 
     [UnityTearDown]
-    public void Teardown()
+    public IEnumerator Teardown()
     {
         Object.DestroyImmediate(playerGameObject);
         Object.DestroyImmediate(healthPackGameObject);
-        Object.DestroyImmediate(healthUI);
-        Object.DestroyImmediate(hpText);
+        Object.DestroyImmediate(canvasGO);
+
+        yield return null;
     }
 
     [UnityTest]

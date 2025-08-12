@@ -12,16 +12,20 @@ public class HealthTests : BasePlayModeTest
     Health health;
 
     [UnitySetUp]
-    public void Setup()
+    public IEnumerator Setup()
     {
         gameObject = new GameObject();
         health = gameObject.AddComponent<Health>();
+
+        yield return null;
     }
 
     [UnityTearDown]
-    public void Teardown()
+    public IEnumerator Teardown()
     {
         Object.DestroyImmediate(gameObject);
+
+        yield return null;
     }
 
     [UnityTest]

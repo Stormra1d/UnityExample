@@ -2,9 +2,6 @@ name: UnityPipeline
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
     inputs:
       target_platform:
@@ -128,6 +125,7 @@ jobs:
           projectPath: ${{ env.PROJECT_PATH }}
           githubToken: ${{ secrets.GITHUB_TOKEN }}
           testMode: PlayMode
+          artifactsPath: artifacts
           customParameters: -enableCodeCoverage -coverageResultsPath ./Coverage -coverageOptions enableCyclomaticComplexity;generateHtmlReport
 
       - name: Upload Test Results (XML, logs, coverage)
@@ -136,7 +134,8 @@ jobs:
         with:
           name: unity-test-results
           path: |
-            **/TestResults/**/*.xml
+            artifacts/**/*.xml
+            artifacts/**/*.log
             **/Logs/**
             Coverage/**
           retention-days: 14
@@ -146,7 +145,7 @@ jobs:
         uses: dorny/test-reporter@v1
         with:
           name: Unity PlayMode Tests
-          path: '**/TestResults/**/*.xml'
+          path: 'artifacts/*.xml'
           reporter: java-junit
           fail-on-error: false
       

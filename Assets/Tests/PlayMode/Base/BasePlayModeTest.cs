@@ -14,6 +14,19 @@ public abstract class BasePlayModeTest
 
         var s = SceneManager.CreateScene($"TestScene_{TestContext.CurrentContext.Test.ID}");
         SceneManager.SetActiveScene(s);
+
+        if (Object.FindFirstObjectByType<Camera>() == null)
+        {
+            var camGo = new GameObject("TestCamera");
+            camGo.tag = "MainCamera";
+            camGo.AddComponent<Camera>();
+        }
+        if (Object.FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
+        {
+            var es = new GameObject("EventSystem");
+            es.AddComponent<UnityEngine.EventSystems.EventSystem>();
+            es.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+        }
     }
 
     [TearDown]
@@ -24,6 +37,10 @@ public abstract class BasePlayModeTest
             mb.StopAllCoroutines();
             if (mb.IsInvoking()) mb.CancelInvoke();
         }
+
+        var active = SceneManager.GetActiveScene();
+        foreach (var go in active.GetRootGameObjects())
+            Object.DestroyImmediate(go);
 
         var probe = new GameObject("DDOL_Probe");
         Object.DontDestroyOnLoad(probe);

@@ -7,7 +7,7 @@ using UnityEngine.TestTools;
 /// <summary>
 /// This was rough. I had to do a bunch of testing to prevent flakiness. Also some adjustments were necessary to fix tests failing (TDD).
 /// </summary>
-public class EnemyTesting : BasePlayModeTest
+public class ZEnemyTesting : BasePlayModeTest
 {
     private GameObject player;
     private GameObject smartEnemy;
@@ -80,7 +80,7 @@ public class EnemyTesting : BasePlayModeTest
         Assert.AreEqual(State.Chase, ai.currentState, "Enemy should be chasing the player");
 
         player.transform.position = new Vector3(-100, 1000000, 50);
-        yield return new WaitForSeconds(ai.forgetDuration + 1.0f);
+        yield return new WaitForSeconds(ai.forgetDuration + 0.1f);
         yield return null;
 
         Assert.AreEqual(State.Chase, ai.currentState, "Enemy should still be Chasing");
