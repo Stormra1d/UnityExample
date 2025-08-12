@@ -142,11 +142,11 @@ jobs:
       
       - name: Publish Test Results
         if: always() && steps.mode.outputs.run_tests == 'true'
-        uses: dorny/test-reporter@v1
+        uses: dorny/test-reporter@main
         with:
           name: Unity PlayMode Tests
           path: 'artifacts/*.xml'
-          reporter: dotnet-trx
+          reporter: dotnet-nunit
           fail-on-error: false
       
       - name: Build
