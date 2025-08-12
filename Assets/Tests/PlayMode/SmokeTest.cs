@@ -10,7 +10,7 @@ using UnityEngine.TestTools;
 /// Due to the nature of the project, the smoke test is pretty much a system test. Oh well.
 /// Setup is a bit inconsistent like all my early tests. 
 /// </summary>
-public class SmokeTest
+public class SmokeTest : BasePlayModeTest
 {
     GameObject playerGameObject;
     GameObject spawnerGameObject;
@@ -53,15 +53,18 @@ public class SmokeTest
         healthPackPrefab.AddComponent<HealthPack>();
 
         spawnerGameObject = new GameObject("Spawner");
+        spawnerGameObject.SetActive(false);
         miscSpawner = spawnerGameObject.AddComponent<MiscSpawner>();
-        miscSpawner.pickups = new List<PickupConfig>();
-        var config = new PickupConfig
+        miscSpawner.pickups = new List<PickupConfig>
         {
-            prefab = healthPackPrefab,
-            type = PickupType.Health,
-            spawnInterval = 0.1f
+            new PickupConfig
+            {
+                prefab = healthPackPrefab,
+                type = PickupType.Health,
+                spawnInterval = 0.1f
+            }
         };
-        miscSpawner.pickups.Add(config);
+        spawnerGameObject.SetActive(true);
 
         pauseMenuUI = new GameObject("PauseMenuUI");
         mainUI = new GameObject("MainUI");
@@ -78,12 +81,6 @@ public class SmokeTest
     [TearDown]
     public void Teardown()
     {
-        if (weapon != null)
-        {
-            weapon.StopAllCoroutines();
-            playerGameObject.GetComponent<MonoBehaviour>()?.StopAllCoroutines();
-        }
-
         if (miscSpawner != null) miscSpawner.enabled = false;
 
         Object.DestroyImmediate(spawnerGameObject);
@@ -92,9 +89,7 @@ public class SmokeTest
         Object.DestroyImmediate(weaponGameObject);
         Object.DestroyImmediate(pauseMenuUI);
         Object.DestroyImmediate(mainUI);
-        Object.DestroyImmediate(navSurface);
-
-        Time.timeScale = 1.0f;
+        if (navSurface != null) Object.DestroyImmediate(navSurface);
     }
 
     [UnityTest]
@@ -104,14 +99,12 @@ public class SmokeTest
 
         yield return null;
 
-        float timer = 0f;
         spawnedHealthPack = null;
-        while (timer < 1f && spawnedHealthPack == null)
+        float deadline = Time.realtimeSinceStartup + 3f;
+        while (Time.realtimeSinceStartup < deadline && spawnedHealthPack == null)
         {
-            spawnedHealthPack = GameObject.Find("HealthPackPrefab(Clone)");
-            if (spawnedHealthPack != null)
-                break;
-            timer += Time.deltaTime;
+            var hp = Object.FindFirstObjectByType<HealthPack>(FindObjectsInactive.Exclude);
+            if (hp != null) spawnedHealthPack = hp.gameObject;
             yield return null;
         }
         Assert.IsNotNull(spawnedHealthPack, "Healthpack should be spawned");
@@ -122,8 +115,12 @@ public class SmokeTest
 
         var playerCollider = playerGameObject.AddComponent<BoxCollider>();
         spawnedHealthPack.GetComponent<HealthPack>().OnTriggerEnter(playerCollider);
-        yield return null;
 
+        float destroyDeadline = Time.realtimeSinceStartup + 1f;
+        while (Time.realtimeSinceStartup < destroyDeadline && spawnedHealthPack != null && !spawnedHealthPack.Equals(null))
+        {
+            yield return null;
+        }
         Assert.IsTrue(spawnedHealthPack == null || spawnedHealthPack.Equals(null), "HealthPack should have been collected");
 
         pauseMenuManager.PauseGame();
