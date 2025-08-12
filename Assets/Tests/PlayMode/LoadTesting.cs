@@ -9,7 +9,7 @@ using System.Linq;
 using UnityEngine.Profiling;
 using System.Diagnostics;
 
-public class LoadTesting
+public class LoadTesting : BasePlayModeTest
 {
     private GameObject playerGameObject;
     private readonly string playerPrefabPath = "Player";

@@ -7,7 +7,7 @@ using UnityEngine.TestTools;
 /// <summary>
 /// This was rough. I had to do a bunch of testing to prevent flakiness. Also some adjustments were necessary to fix tests failing (TDD).
 /// </summary>
-public class EnemyTesting
+public class EnemyTesting : BasePlayModeTest
 {
     private GameObject player;
     private GameObject smartEnemy;

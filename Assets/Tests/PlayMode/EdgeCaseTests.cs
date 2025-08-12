@@ -7,7 +7,7 @@ using UnityEngine.TestTools;
 /// This one felt really pointless to do. What should and shouldn't be happening is easy to detect in code. Actually, that's totally an issue. This test should SIMULATE taking damage and healing.
 /// But even then, the game can very easily differentiate which was called first, by lines of code. Idk, this seems useless.
 /// </summary>
-public class EdgeCaseTests
+public class EdgeCaseTests : BasePlayModeTest
 {
     GameObject gameObject;
     Health health;
@@ -25,8 +25,6 @@ public class EdgeCaseTests
     public IEnumerator Teardown()
     {
         Object.DestroyImmediate(gameObject);
-
-        Time.timeScale = 1.0f;
 
         yield return null;
     }

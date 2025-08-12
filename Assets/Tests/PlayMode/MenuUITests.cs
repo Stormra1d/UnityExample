@@ -12,12 +12,11 @@ using UnityEngine.UI;
 /// <summary>
 /// Seem rather flaky with opening the pause menu via input simulation. Input Simulation proved difficult and required changing to using InputActions for Input control.
 /// </summary>
-public class MenuUITests
+public class MenuUITests : BasePlayModeTest
 {
     [UnitySetUp]
     public IEnumerator SetUp()
     {
-        Time.timeScale = 1f;
         yield return null;
 
         foreach (var device in InputSystem.devices)
@@ -28,15 +27,6 @@ public class MenuUITests
     [UnityTearDown]
     public IEnumerator Teardown()
     {
-        for (int i = 0; i < SceneManager.sceneCount; i++)
-        {
-            var scene = SceneManager.GetSceneAt(i);
-            if (scene.name == "TestMainMenu" || scene.name == "TestGame")
-            {
-                SceneManager.UnloadSceneAsync(scene);
-            }
-        }
-
         var keyboards = InputSystem.devices;
         for (int i = keyboards.Count - 1; i >= 0; i--)
         {
@@ -48,9 +38,6 @@ public class MenuUITests
 
         foreach (var device in InputSystem.devices)
             InputSystem.ResetDevice(device);
-
-        Time.timeScale = 1f;
-
 
         yield return null;
     }

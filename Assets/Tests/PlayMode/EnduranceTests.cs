@@ -13,7 +13,7 @@ using UnityEngine.TestTools;
 /// Here I had a better system. Across all Performance Tests I think I'm pretty consistent with what I put in Setup/Teardown and how I structure my tests. These are the ones that work best I think.
 /// </summary>
 [Category("Endurance")]
-public class EnduranceTests
+public class EnduranceTests : BasePlayModeTest
 {
     private List<GameObject> spawnedEnemies = new();
     private List<GameObject> spawnedProjectiles = new();

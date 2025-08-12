@@ -9,7 +9,7 @@ using UnityEngine.Profiling;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
-public class SpikeTests
+public class SpikeTests : BasePlayModeTest
 {
     private List<GameObject> spawnedEnemies = new();
     private List<GameObject> spawnedProjectiles = new();

@@ -28,7 +28,7 @@ public class SmokeTest : BasePlayModeTest
 
     NavMeshSurface navSurface;
 
-    [SetUp]
+    [UnitySetUp]
     public void Setup()
     {
         var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
@@ -78,7 +78,7 @@ public class SmokeTest : BasePlayModeTest
         pauseMenuManager.player = playerGameObject;
     }
 
-    [TearDown]
+    [UnityTearDown]
     public void Teardown()
     {
         if (miscSpawner != null) miscSpawner.enabled = false;

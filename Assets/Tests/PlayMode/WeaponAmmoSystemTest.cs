@@ -20,7 +20,7 @@ public class WeaponAmmoSystemTest
     AmmoUIManager ammoUIManager;
     TextMeshProUGUI ammoText;
 
-    [SetUp]
+    [UnitySetUp]
     public void Setup()
     {
         var cameraGameObject = new GameObject("Camera");
@@ -58,15 +58,9 @@ public class WeaponAmmoSystemTest
         ammoUIManager.currentWeapon = weapon;
     }
 
-    [TearDown]
+    [UnityTearDown]
     public void Teardown()
     {
-        if(weapon != null)
-        {
-            weapon.StopAllCoroutines();
-            playerGameObject.GetComponent<MonoBehaviour>()?.StopAllCoroutines();
-        }
-
         Object.DestroyImmediate(uiGameobject);
         Object.DestroyImmediate(playerGameObject);
         Object.DestroyImmediate(ammoUIManager);
@@ -75,8 +69,6 @@ public class WeaponAmmoSystemTest
         Object.DestroyImmediate(bulletPrefab);
         Object.DestroyImmediate(bulletSpawnGameObject);
         Object.DestroyImmediate(camera.gameObject);
-
-        Time.timeScale = 1.0f;
     }
 
     [UnityTest]

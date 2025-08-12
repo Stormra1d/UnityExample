@@ -8,7 +8,7 @@ using UnityEngine.TestTools;
 /// Integration Test. Should work on gettin gSetup/Teardown standardized. These also use the default Setup/Teardown rather than UnityTeardown and Setup. 
 /// Idk about the rest.
 /// </summary>
-public class HealthPickupTests
+public class HealthPickupTests : BasePlayModeTest
 {
     GameObject playerGameObject;
     Health playerHealth;
@@ -17,7 +17,7 @@ public class HealthPickupTests
     GameObject healthPackGameObject;
     HealthPack healthPack;
 
-    [SetUp]
+    [UnitySetUp]
     public void Setup()
     {
         playerGameObject = new GameObject("Player");
@@ -37,15 +37,13 @@ public class HealthPickupTests
         healthPack.healAmount = 25f;
     }
 
-    [TearDown]
+    [UnityTearDown]
     public void Teardown()
     {
         Object.DestroyImmediate(playerGameObject);
         Object.DestroyImmediate(healthPackGameObject);
         Object.DestroyImmediate(healthUI);
         Object.DestroyImmediate(hpText);
-
-        Time.timeScale = 1.0f;
     }
 
     [UnityTest]

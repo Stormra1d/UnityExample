@@ -8,7 +8,7 @@ using UnityEngine.SceneManagement;
 /// <summary>
 /// These, as mentioned in the VSC file, I had to adjust code as I did some TDD. I thought of the test for Collectibles not spawning in Geo and noticed it can happen and fixed it.
 /// </summary>
-public class SpawnValidationTests
+public class SpawnValidationTests : BasePlayModeTest
 {
     private const string sceneName = "Game";
     private GameObject spawnerInstance;

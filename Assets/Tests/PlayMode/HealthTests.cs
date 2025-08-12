@@ -6,24 +6,22 @@ using UnityEngine.TestTools;
 /// <summary>
 /// Actor Tests, not Unit Tests. First tests I wrote, issues with consistency and setup.
 /// </summary>
-public class HealthTests
+public class HealthTests : BasePlayModeTest
 {
     GameObject gameObject;
     Health health;
 
-    [SetUp]
+    [UnitySetUp]
     public void Setup()
     {
         gameObject = new GameObject();
         health = gameObject.AddComponent<Health>();
     }
 
-    [TearDown]
+    [UnityTearDown]
     public void Teardown()
     {
         Object.DestroyImmediate(gameObject);
-
-        Time.timeScale = 1.0f;
     }
 
     [UnityTest]
