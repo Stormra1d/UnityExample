@@ -49,3 +49,10 @@ MonoBehaviour:
   - {fileID: 1829671453489917385, guid: de3af29b9602d37448b9f2c0d8d3477d, type: 3}
   spawnCount: 10
   collectibleSpawnRadius: 15
+  groundMask:
+    serializedVersion: 2
+    m_Bits: 8
+  blockingMask:
+    serializedVersion: 2
+    m_Bits: 9
+  minSeparation: 0.5

@@ -6,6 +6,10 @@ public class CollectibleSpawner : MonoBehaviour
     public int spawnCount = 10;
     public float collectibleSpawnRadius = 15f;
 
+    public LayerMask groundMask;
+    public LayerMask blockingMask;
+    public float minSeparation = 0.5f;
+
     private void Start()
     {
         SpawnCollectibles();
@@ -24,11 +28,11 @@ public class CollectibleSpawner : MonoBehaviour
                 {
                     RaycastHit hit;
                     Vector3 rayStart = spawnPoint + Vector3.up * 5f;
-                    if (Physics.Raycast(rayStart, Vector3.down, out hit, 10f, LayerMask.GetMask("Movable")))
+                    if (Physics.Raycast(rayStart, Vector3.down, out hit, 10f, groundMask, QueryTriggerInteraction.Collide))
                     {
                         Vector3 candidate = hit.point + Vector3.up * 0.3f;
-                        float checkRadius = 0.3f;
-                        Collider[] overlaps = Physics.OverlapSphere(candidate, checkRadius, LayerMask.GetMask("Movable"));
+                        Collider[] overlaps = Physics.OverlapSphere(candidate, minSeparation, blockingMask, QueryTriggerInteraction.Collide);
+
                         bool blocked = false;
                         foreach (var col in overlaps)
                         {
@@ -40,7 +44,8 @@ public class CollectibleSpawner : MonoBehaviour
                         }
                         if (!blocked)
                         {
-                            Instantiate(collectiblePrefabs[Random.Range(0, collectiblePrefabs.Length)], candidate, Quaternion.identity);
+                            var prefab = collectiblePrefabs[Random.Range(0, collectiblePrefabs.Length)];
+                            Instantiate(prefab, candidate, Quaternion.identity);
                             placed = true;
                             break;
                         }
