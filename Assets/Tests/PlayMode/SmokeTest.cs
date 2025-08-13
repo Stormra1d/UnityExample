@@ -127,8 +127,8 @@ public class SmokeTest : BasePlayModeTest
 
         Assert.IsNotNull(spawnedHealthPack, "Healthpack should be spawned");
 
-        NavMeshHit hit;
-        bool valid = NavMesh.SamplePosition(spawnedHealthPack.transform.position, out hit, 1f, NavMesh.AllAreas);
+        NavMeshHit navHit;
+        bool valid = NavMesh.SamplePosition(spawnedHealthPack.transform.position, out navHit, 1f, NavMesh.AllAreas);
         Assert.IsTrue(valid, "Healthpack should be on the NavMesh");
 
         var playerCollider = playerGameObject.AddComponent<BoxCollider>();
