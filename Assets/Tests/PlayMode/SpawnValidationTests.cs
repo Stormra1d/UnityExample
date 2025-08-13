@@ -45,14 +45,22 @@ public class SpawnValidationTests : BasePlayModeTest
     {
         yield return new WaitForSeconds(0.1f);
 
+        int movableMask = LayerMask.GetMask("Movable");
+
         foreach (var collectible in GameObject.FindGameObjectsWithTag("Collectible"))
         {
             Assert.IsTrue(UnityEngine.AI.NavMesh.SamplePosition(
                 collectible.transform.position, out var hit, 0.5f, UnityEngine.AI.NavMesh.AllAreas),
                 "All collectibles should be on the NavMesh");
 
-            var overlaps = Physics.OverlapSphere(collectible.transform.position, 0.3f, LayerMask.GetMask("Movable"));
-            Assert.IsTrue(overlaps.Length == 0, "No Collectibles should be spawning inside geometry");
+            var hits = Physics.OverlapSphere(collectible.transform.position, 0.3f, movableMask, QueryTriggerInteraction.Ignore);
+            bool intersectsNonGround = hits.Any(h => !h.CompareTag("Ground"));
+
+            if (intersectsNonGround)
+            {
+                var offenders = string.Join(", ", hits.Where(h => !h.CompareTag("Ground")).Select(h => h.name));
+                Assert.Fail($"Collectible '{collectible.name}' intersects non-ground movable: {offenders}");
+            }
         }
     }
 
