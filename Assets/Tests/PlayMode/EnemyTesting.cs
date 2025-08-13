@@ -23,13 +23,15 @@ public class ZEnemyTesting : BasePlayModeTest
         NavMesh.RemoveAllNavMeshData();
 
         if (!SceneManager.GetSceneByName("GameAITest").isLoaded)
-        {
-            yield return SceneManager.UnloadSceneAsync("GameAITest");
-        }
+            SceneManager.LoadScene("GameAITest");
 
         yield return new WaitUntil(() => SceneManager.GetActiveScene().name == "GameAITest");
 
-        yield return new WaitUntil(() => NavMesh.CalculateTriangulation().indices != null);
+        yield return null;
+        foreach (var spawner in Object.FindObjectsByType<CollectibleSpawner>(FindObjectsSortMode.None))
+            spawner.gameObject.SetActive(false);
+
+        yield return null;
     }
 
     [UnityTearDown]
@@ -71,37 +73,40 @@ public class ZEnemyTesting : BasePlayModeTest
         player = Object.Instantiate(Resources.Load<GameObject>("Player"), playerPos, Quaternion.identity);
 
         smartEnemy = Object.Instantiate(Resources.Load<GameObject>("EnemyAI"), enemyPos, Quaternion.identity);
+
         var ai = smartEnemy.GetComponent<EnemyAI>();
+        ai.patrolOrigin = enemyPos;
 
-        Vector3 direction = player.transform.position - smartEnemy.transform.position;
-        Quaternion lookRotation = Quaternion.LookRotation(direction);
+        ai.playerLayer = LayerMask.GetMask("Player");
+        ai.obstacleMask = LayerMask.GetMask("Movable");
 
-        smartEnemy.transform.rotation = lookRotation;
-
+        var agent = smartEnemy.GetComponent<NavMeshAgent>();
         yield return null;
 
-        player.transform.position = smartEnemy.transform.position + smartEnemy.transform.forward * 2f;
-        yield return new WaitForSeconds(1f);
+        agent.Warp(agent.transform.position);
         yield return null;
+
+        smartEnemy.transform.rotation = Quaternion.LookRotation(player.transform.position - smartEnemy.transform.position);
+        yield return new WaitForSeconds(0.25f);
 
         Assert.AreEqual(State.Chase, ai.currentState, "Enemy should be chasing the player");
 
-        player.transform.position = new Vector3(-100, 1000000, 50);
-        float timeout = ai.forgetDuration + 2f;
-        yield return new WaitForSeconds(0.1f);
-        yield return new WaitUntil(() => ai.isGoingToLastKnownPosition || (timeout -= Time.deltaTime) <= 0);
+        var wall = MakeWall(new Vector3(7.5f, 1.5f, 0), new Vector3(1f, 3f, 4f));
 
-        Assert.AreEqual(State.Chase, ai.currentState, "Enemy should still be Chasing");
-        Assert.IsTrue(ai.isGoingToLastKnownPosition, "Enemy should be on way to last known position");
-
-        yield return new WaitUntil(() => !ai.isGoingToLastKnownPosition);
+        player.transform.position = new Vector3(10f, 0f, 0f);
         yield return null;
 
+        yield return new WaitUntil(() => !ai.PlayerInSight());
+
+        yield return WaitUntilOrTimeout(() => ai.isGoingToLastKnownPosition, 5f, "ai.isGoingToLastKnownPosition for 5s");
+        Assert.IsTrue(ai.isGoingToLastKnownPosition, "Enemy should be on way to last known position");
+        Assert.AreEqual(State.Chase, ai.currentState, "Enemy should still be Chasing while heading to LKP");
+
+        yield return WaitUntilOrTimeout(() => !ai.isGoingToLastKnownPosition, 5f, "!ai.isGoingToLastKnownPosition for 5s");
         Assert.IsFalse(ai.isGoingToLastKnownPosition, "Enemy should have reached last known position");
         Assert.AreEqual(State.Wait, ai.currentState, "Enemy should be waiting at last known position");
 
-        yield return new WaitForSeconds(2.5f);
-
+        yield return WaitUntilOrTimeout(() => ai.currentState == State.Patrol, ai.forgetDuration + 3f, "ai.currentState == State.Patrol for 3s + forget duration");
         Assert.AreEqual(State.Patrol, ai.currentState, "Enemy should be on patrol");
     }
 
@@ -117,5 +122,26 @@ public class ZEnemyTesting : BasePlayModeTest
                 yield return new WaitUntil(() => unload.isDone);
             }
         }
+    }
+
+    private GameObject MakeWall(Vector3 center, Vector3 size)
+    {
+        var wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        wall.transform.position = center;
+        wall.transform.localScale = size;
+        var col = wall.GetComponent<Collider>();
+        col.gameObject.layer = LayerMask.NameToLayer("Movable");
+        return wall;
+    }
+
+    private static IEnumerator WaitUntilOrTimeout(System.Func<bool> predicate, float timeoutSeconds, string message)
+    {
+        float start = Time.time;
+        while (Time.time - start < timeoutSeconds)
+        {
+            if (predicate()) yield break;
+            yield return null;
+        }
+        Assert.Fail($"Timeout after {timeoutSeconds:F2}s waiting for condition: {predicate.Method.Name}: {message}");
     }
 }

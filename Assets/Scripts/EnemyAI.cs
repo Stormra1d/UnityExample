@@ -21,7 +21,7 @@ public class EnemyAI : BaseEnemyAI
 
     Vector3 targetPosition;
     float timer;
-    float forgetTimer = 0f;
+    public float forgetTimer = 0f;
     public float forgetDuration = 3f;
     Vector3 lastKnownPosition;
     public bool isGoingToLastKnownPosition = false;
@@ -53,7 +53,7 @@ public class EnemyAI : BaseEnemyAI
                 agent.SetDestination(lastKnownPosition);
             }
         }
-        else
+        else if (forgetTimer != 0f)
         {
             forgetTimer = 0f;
         }
@@ -74,6 +74,7 @@ public class EnemyAI : BaseEnemyAI
 
     void SwitchState(State newState, float delay = 0f)
     {
+        bool wasChasing = currentState == State.Chase;
         currentState = newState;
         timer = delay;
 
@@ -82,7 +83,7 @@ public class EnemyAI : BaseEnemyAI
             GenerateNewPatrolPoint();
         }
 
-        if (newState != State.Chase)
+        if (newState != State.Chase && !wasChasing)
         {
             forgetTimer = 0f;
             isGoingToLastKnownPosition = false;
@@ -157,11 +158,14 @@ public class EnemyAI : BaseEnemyAI
             return;
         }
 
-        agent.speed = chaseSpeed;
-        agent.SetDestination(player.position);
+        if (PlayerInSight())
+        {
+            agent.speed = chaseSpeed;
+            agent.SetDestination(player.position);
+        }
     }
 
-    bool PlayerInSight()
+    public bool PlayerInSight()
     {
         Vector3 dirToPlayer = (player.position - transform.position);
         if (dirToPlayer.magnitude > sightRange)
@@ -172,6 +176,7 @@ public class EnemyAI : BaseEnemyAI
         float angle = Vector3.Angle(transform.forward, dirToPlayer);
         if (angle > fovAngle / 2f)
         {
+            Debug.Log($"E: PIS: Out of FOV");
             return false;
         }
 
@@ -179,12 +184,24 @@ public class EnemyAI : BaseEnemyAI
         {
             if (hit.collider.CompareTag("Player"))
             {
-                lastKnownPosition = player.position;
+                SetLastKnownPosition(player.position);
                 return true;
             }
         }
-
         return false;
+    }
+
+    public void SetLastKnownPosition(Vector3 position)
+    {
+        if (NavMesh.SamplePosition(position, out NavMeshHit hit, 1.0f, NavMesh.AllAreas))
+        {
+            lastKnownPosition = hit.position;
+        }
+        else
+        {
+            NavMesh.SamplePosition(position, out hit, 5.0f, NavMesh.AllAreas);
+            lastKnownPosition = hit.position;
+        }
     }
 
     void MoveTowards(Vector3 target, float speed)

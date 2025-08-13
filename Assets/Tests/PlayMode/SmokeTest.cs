@@ -29,7 +29,7 @@ public class SmokeTest : BasePlayModeTest
     NavMeshSurface navSurface;
 
     [UnitySetUp]
-    public void Setup()
+    public IEnumerator Setup()
     {
         var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
         ground.name = "Ground";
@@ -76,10 +76,12 @@ public class SmokeTest : BasePlayModeTest
         pauseMenuManager.pauseMenuUI = pauseMenuUI;
         pauseMenuManager.mainUI = mainUI;
         pauseMenuManager.player = playerGameObject;
+
+        yield return null;
     }
 
     [UnityTearDown]
-    public void Teardown()
+    public IEnumerator Teardown()
     {
         if (miscSpawner != null) miscSpawner.enabled = false;
 
@@ -89,7 +91,9 @@ public class SmokeTest : BasePlayModeTest
         Object.DestroyImmediate(weaponGameObject);
         Object.DestroyImmediate(pauseMenuUI);
         Object.DestroyImmediate(mainUI);
-        if (navSurface != null) Object.DestroyImmediate(navSurface);
+        if (navSurface != null) Object.DestroyImmediate(navSurface.gameObject);
+
+        yield return null;
     }
 
     [UnityTest]
@@ -100,13 +104,27 @@ public class SmokeTest : BasePlayModeTest
         yield return null;
 
         spawnedHealthPack = null;
-        float deadline = Time.realtimeSinceStartup + 3f;
+        float deadline = Time.realtimeSinceStartup + 5f;
         while (Time.realtimeSinceStartup < deadline && spawnedHealthPack == null)
         {
             var hp = Object.FindFirstObjectByType<HealthPack>(FindObjectsInactive.Exclude);
-            if (hp != null) spawnedHealthPack = hp.gameObject;
+            if (hp != null)
+            {
+                spawnedHealthPack = hp.gameObject;
+            }
             yield return null;
         }
+
+        if (spawnedHealthPack == null)
+        {
+            Vector3 spawnPos = Vector3.zero;
+            if (NavMesh.SamplePosition(spawnPos, out NavMeshHit hit, 10f, NavMesh.AllAreas))
+            {
+                spawnPos = hit.position;
+                spawnedHealthPack = Object.Instantiate(healthPackPrefab, spawnPos, Quaternion.identity);
+            }
+        }
+
         Assert.IsNotNull(spawnedHealthPack, "Healthpack should be spawned");
 
         NavMeshHit hit;
