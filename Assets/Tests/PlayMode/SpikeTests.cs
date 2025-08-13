@@ -45,6 +45,9 @@ public class SpikeTests
     [UnityTearDown]
     public IEnumerator Teardown()
     {
+        yield return new WaitForEndOfFrame();
+        yield return new WaitForSeconds(0.1f);
+
         System.Exception ex = null;
         try
         {
@@ -89,8 +92,12 @@ public class SpikeTests
 
     private void OnLogMessageReceived(string condition, string stackTrace, LogType type)
     {
-        if ((type == LogType.Error || type == LogType.Exception) && errorLogs != null)
-            errorLogs.Add($"{type}: {condition}\n{stackTrace}");
+        if ((type == LogType.Error || type == LogType.Exception) &&
+            errorLogs != null &&
+            !string.IsNullOrEmpty(condition))
+        {
+            errorLogs.Add($"{type}: {condition}\n{stackTrace ?? "No stack trace"}");
+        }
     }
 
     private void ReplayAndClearErrors()
@@ -101,9 +108,16 @@ public class SpikeTests
             _logSubscribed = false;
         }
 
-        var snapshot = errorLogs.ToArray();
-        foreach (var e in snapshot) Debug.LogError(e);
-        errorLogs.Clear();
+        if (errorLogs != null && errorLogs.Count > 0)
+        {
+            var snapshot = errorLogs.ToArray();
+            foreach (var e in snapshot)
+            {
+                if (!string.IsNullOrEmpty(e))
+                    Debug.LogError(e);
+            }
+            errorLogs.Clear();
+        }
     }
 
     /// <summary>

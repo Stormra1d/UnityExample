@@ -1,31 +1,34 @@
 using NUnit.Framework;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.TestTools;
 
 public abstract class BasePlayModeTest
 {
     float _prevTimeScale;
+    readonly System.Collections.Generic.List<GameObject> _owned = new();
 
-    [SetUp]
+    [UnitySetUp]
     public virtual void BaseSetUp()
     {
         _prevTimeScale = Time.timeScale;
         Time.timeScale = 1f;
 
-        var s = SceneManager.CreateScene($"TestScene_{TestContext.CurrentContext.Test.ID}");
-        SceneManager.SetActiveScene(s);
-
-        if (Object.FindFirstObjectByType<Camera>() == null)
-        {
-            var camGo = new GameObject("TestCamera");
-            camGo.tag = "MainCamera";
-            camGo.AddComponent<Camera>();
+        if (!Object.FindFirstObjectByType<Camera>())
+        { 
+            var cam = new GameObject("TestCamera"); 
+            cam.tag = "MainCamera"; cam.AddComponent<Camera>(); 
+            _owned.Add(cam); 
         }
-        if (Object.FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
+
+        if (!Object.FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>())
         {
             var es = new GameObject("EventSystem");
             es.AddComponent<UnityEngine.EventSystems.EventSystem>();
             es.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+            _owned.Add(es);
         }
     }
 
@@ -34,37 +37,14 @@ public abstract class BasePlayModeTest
     {
         foreach (var mb in Object.FindObjectsByType<MonoBehaviour>(FindObjectsInactive.Include, FindObjectsSortMode.None))
         {
-            mb.StopAllCoroutines();
-            if (mb.IsInvoking()) mb.CancelInvoke();
+            mb.StopAllCoroutines(); 
+            if (mb.IsInvoking()) mb.CancelInvoke(); 
         }
 
-        var active = SceneManager.GetActiveScene();
-        foreach (var go in active.GetRootGameObjects())
-            Object.DestroyImmediate(go);
-
-        var probe = new GameObject("DDOL_Probe");
-        Object.DontDestroyOnLoad(probe);
-        var ddol = probe.scene;
-        foreach (var go in ddol.GetRootGameObjects())
-        {
-            if (go != probe) Object.DestroyImmediate(go);
-        }
-        Object.DestroyImmediate(probe);
-
-        TryUnload("GameAITest");
-        TryUnload("Game");
-        TryUnload("MainMenu");
-        TryUnload("TestGame");
-        TryUnload("TestMainMenu");
+        foreach (var go in _owned) if (go) Object.DestroyImmediate(go);
+        _owned.Clear();
 
         Time.timeScale = _prevTimeScale;
         PlayerPrefs.DeleteAll();
-        Resources.UnloadUnusedAssets();
-    }
-
-    static void TryUnload(string name)
-    {
-        var scene = SceneManager.GetSceneByName(name);
-        if (scene.isLoaded) SceneManager.UnloadSceneAsync(scene);
     }
 }
