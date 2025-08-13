@@ -1,7 +1,6 @@
 using NUnit.Framework;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using Unity.PerformanceTesting;
 using UnityEngine;
 using UnityEngine.AI;
@@ -11,20 +10,26 @@ using UnityEngine.TestTools;
 
 public class SpikeTests
 {
-    private List<GameObject> spawnedEnemies = new();
-    private List<GameObject> spawnedProjectiles = new();
-    private List<GameObject> spawnedCollectibles = new();
+    private readonly List<GameObject> spawnedEnemies = new();
+    private readonly List<GameObject> spawnedProjectiles = new();
+    private readonly List<GameObject> spawnedCollectibles = new();
     private GameObject playerGameObject;
-    private List<string> errorLogs = new();
+    private readonly List<string> errorLogs = new();
+    private bool _logSubscribed;
 
     [UnitySetUp]
     public IEnumerator Setup()
     {
         SceneManager.LoadScene("PerformanceTestScene");
-        yield return null;
+        while (!SceneManager.GetActiveScene().isLoaded)
+            yield return null;
 
         errorLogs.Clear();
-        Application.logMessageReceived += OnLogMessageReceived;
+        if (!_logSubscribed)
+        {
+            Application.logMessageReceived += OnLogMessageReceived;
+            _logSubscribed = true;
+        }
 
         var playerPrefab = Resources.Load<GameObject>("Player");
         Assert.IsNotNull(playerPrefab, "Player prefab should exist");
@@ -40,26 +45,65 @@ public class SpikeTests
     [UnityTearDown]
     public IEnumerator Teardown()
     {
-        Application.logMessageReceived -= OnLogMessageReceived;
+        System.Exception ex = null;
+        try
+        {
+            DoCleanupNoYield();
+        }
+        catch (System.Exception e)
+        {
+            ex = e;
+        }
 
-        if (playerGameObject) Object.DestroyImmediate(playerGameObject);
-        foreach (var gameObject in spawnedEnemies) if (gameObject) Object.DestroyImmediate(gameObject);
-        foreach (var gameObject in spawnedProjectiles) if (gameObject) Object.DestroyImmediate(gameObject);
-        foreach (var gameObject in spawnedCollectibles) if (gameObject) Object.DestroyImmediate(gameObject);
+        yield return null;
+
+        if (ex != null)
+            Debug.LogError("Teardown exception: " + ex);
+    }
+
+    private void DoCleanupNoYield()
+    {
+        if (_logSubscribed)
+        {
+            Application.logMessageReceived -= OnLogMessageReceived;
+            _logSubscribed = false;
+        }
+
+        if (playerGameObject) Object.Destroy(playerGameObject);
+
+        DestroyList(spawnedEnemies);
+        DestroyList(spawnedProjectiles);
+        DestroyList(spawnedCollectibles);
 
         spawnedEnemies.Clear();
         spawnedProjectiles.Clear();
         spawnedCollectibles.Clear();
-
-        yield return null;
     }
 
-    void OnLogMessageReceived(string condition, string stackTrace, LogType type)
+    private static void DestroyList(List<GameObject> list)
     {
-        if (type == LogType.Error || type == LogType.Exception)
-        {
+        if (list == null) return;
+        foreach (var go in list)
+            if (go) Object.Destroy(go);
+    }
+
+    private void OnLogMessageReceived(string condition, string stackTrace, LogType type)
+    {
+        if ((type == LogType.Error || type == LogType.Exception) && errorLogs != null)
             errorLogs.Add($"{type}: {condition}\n{stackTrace}");
+    }
+
+    private void ReplayAndClearErrors()
+    {
+        if (_logSubscribed)
+        {
+            Application.logMessageReceived -= OnLogMessageReceived;
+            _logSubscribed = false;
         }
+
+        var snapshot = errorLogs.ToArray();
+        foreach (var e in snapshot) Debug.LogError(e);
+        errorLogs.Clear();
     }
 
     /// <summary>
@@ -105,7 +149,7 @@ public class SpikeTests
         }
 
         Debug.Log($"PositiveSpikeTest: {errorLogs.Count} errors / exceptions captured");
-        foreach (var error in errorLogs) Debug.LogError(error);
+        ReplayAndClearErrors();
 
         yield return null;
     }
@@ -141,25 +185,23 @@ public class SpikeTests
 
         yield return new WaitForSeconds(2f);
 
-        foreach (var gameObject in spawnedEnemies) if (gameObject) Object.DestroyImmediate(gameObject);
-        foreach (var gameObject in spawnedProjectiles) if (gameObject) Object.DestroyImmediate(gameObject);
-        foreach (var gameObject in spawnedCollectibles) if (gameObject) Object.DestroyImmediate(gameObject);
-
+        DestroyList(spawnedEnemies);
+        DestroyList(spawnedProjectiles);
+        DestroyList(spawnedCollectibles);
         spawnedEnemies.Clear();
         spawnedProjectiles.Clear();
         spawnedCollectibles.Clear();
-
         yield return null;
 
         for (int i = 0; i < 60; i++)
         {
             yield return null;
-            Measure.Custom("NegativeSpike", 1.0f / Time.deltaTime);
+            Measure.Custom("NegativeSpike_FPS", 1.0f / Time.deltaTime);
             Measure.Custom("NegativeSpike_MemoryMB", Profiler.GetTotalAllocatedMemoryLong() / (1024.0f * 1024.0f));
         }
 
         Debug.Log($"NegativeSpikeTest: {errorLogs.Count} errors / exceptions captured");
-        foreach (var error in errorLogs) Debug.LogError(error);
+        ReplayAndClearErrors();
 
         yield return null;
     }
@@ -198,22 +240,22 @@ public class SpikeTests
 
             yield return new WaitForSeconds(1f);
 
-            foreach (var gameObject in spawnedEnemies) if (gameObject) Object.DestroyImmediate(gameObject);
-            foreach (var gameObject in spawnedProjectiles) if (gameObject) Object.DestroyImmediate(gameObject);
-            foreach (var gameObject in spawnedCollectibles) if (gameObject) Object.DestroyImmediate(gameObject);
-
+            DestroyList(spawnedEnemies);
+            DestroyList(spawnedProjectiles);
+            DestroyList(spawnedCollectibles);
             spawnedEnemies.Clear();
             spawnedProjectiles.Clear();
             spawnedCollectibles.Clear();
 
+            yield return null;
             yield return new WaitForSeconds(1f);
 
-            Measure.Custom("RepeatedSpike", 1.0f / Time.deltaTime);
+            Measure.Custom("RepeatedSpike_FPS", 1.0f / Time.deltaTime);
             Measure.Custom("RepeatedSpike_MemoryMB", Profiler.GetTotalAllocatedMemoryLong() / (1024.0f * 1024.0f));
         }
 
         Debug.Log($"RepeatedSpikeTest: {errorLogs.Count} errors / exceptions captured");
-        foreach (var error in errorLogs) Debug.LogError(error);
+        ReplayAndClearErrors();
 
         yield return null;
     }
