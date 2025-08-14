@@ -59,7 +59,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ver="$(awk -F': ' '/m_EditorVersion/ {print $2}' ProjectSettings/ProjectVersion.txt | tr -d '\r')"
+          ver="$(awk -F': ' '$1=="m_EditorVersion"{print $2; exit}' "${{ env.PROJECT_PATH }}/ProjectSettings/ProjectVersion.txt" | tr -d '\r')"
           echo "Detected Unity version: $ver"
           printf 'version=%s\n' "$ver" >> "$GITHUB_OUTPUT"
       
