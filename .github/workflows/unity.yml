@@ -52,21 +52,6 @@ jobs:
         with:
           lfs: true
           fetch-depth: 1
-      - name: Check disk usage
-        run: |
-          df -h
-          docker system df || true
-      - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          android: true
-          haskell: true
-          large-packages: true
-          docker-images: false
-          swap-storage: false
-          dotnet: false
-          tool-cache: false
-
       - name: Cache Library
         uses: actions/cache@v4
         with:
