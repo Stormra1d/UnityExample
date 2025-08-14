@@ -54,16 +54,14 @@ jobs:
           fetch-depth: 1
       - name: Check disk usage
         run: df -h
-      - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          android: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-          dotnet: false
-          tool-cache: false
+      - name: Add 8G swap for tests
+        if: steps.mode.outputs.run_tests == 'true'
+        run: |
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
       - name: Read Unity project version
         id: unity
         shell: bash
@@ -164,7 +162,17 @@ jobs:
           path: 'artifacts/*.xml'
           reporter: dotnet-nunit
           fail-on-error: false
-      
+      - name: Free Disk Space (Ubuntu)
+        if: steps.mode.outputs.run_build == 'true'
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          android: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: false
+          dotnet: false
+          tool-cache: false
       - name: Build
         if: steps.mode.outputs.run_build == 'true'
         uses: game-ci/unity-builder@v4
