@@ -59,9 +59,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ver="$(grep m_EditorVersion ProjectSettings/ProjectVersion.txt | sed 's/.*: //')"
-          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          ver="$(awk -F': ' '/m_EditorVersion/ {print $2}' ProjectSettings/ProjectVersion.txt | tr -d '\r')"
           echo "Detected Unity version: $ver"
+          printf 'version=%s\n' "$ver" >> "$GITHUB_OUTPUT"
       
       - name: Cache Library
         uses: actions/cache@v4
