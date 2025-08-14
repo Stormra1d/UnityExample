@@ -33,7 +33,6 @@ permissions:
   contents: write
   pull-requests: write
   checks: write
-  packages: read
 
 env:
   PROJECT_PATH: .
@@ -53,16 +52,21 @@ jobs:
         with:
           lfs: true
           fetch-depth: 1
-          
-      - name: Detect Unity version
-        id: uver
-        shell: bash
+      - name: Check disk usage
         run: |
-          set -euo pipefail
-          ver="$(awk -F': ' '$1=="m_EditorVersion"{print $2; exit}' "${{ env.PROJECT_PATH }}/ProjectSettings/ProjectVersion.txt" | tr -d '\r')"
-          echo "Detected Unity version: $ver"
-          printf 'version=%s\n' "$ver" >> "$GITHUB_OUTPUT"
-      
+          df -h
+          docker system df || true
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          android: true
+          haskell: true
+          large-packages: true
+          docker-images: false
+          swap-storage: false
+          dotnet: false
+          tool-cache: false
+
       - name: Cache Library
         uses: actions/cache@v4
         with:
@@ -122,29 +126,8 @@ jobs:
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
 
-      - name: Show docker images
-        run: docker images | head -n 20
-
-      - name: Pre-pull Unity editor image (auto-detect suite)
-        id: img
-        shell: bash
-        run: |
-          set -euo pipefail
-          ver="${{ steps.uver.outputs.version }}"
-          variant="base"
-          for suite in 4 3 2 1 0; do
-            tag="${ver}-${variant}-${suite}"
-            echo "Attempting: ghcr.io/game-ci/unity-editor:${tag}"
-            if docker pull "ghcr.io/game-ci/unity-editor:${tag}"; then
-              echo "tag=$tag" >> "$GITHUB_OUTPUT"
-              echo "Resolved image: ghcr.io/game-ci/unity-editor:${tag}"
-              exit 0
-            fi
-          done
-          echo "Could not find a suitable image for ${ver}-${variant}-[4..0]" >&2
-          exit 1
-
       - name: Run PlayMode Tests
+        if: steps.mode.outputs.run_tests == 'true'
         uses: game-ci/unity-test-runner@v4
         env:
           UNITY_LICENSE:  ${{ secrets.UNITY_LICENSE }}
@@ -155,11 +138,7 @@ jobs:
           githubToken: ${{ secrets.GITHUB_TOKEN }}
           testMode: PlayMode
           artifactsPath: artifacts
-          customImage: ghcr.io/game-ci/unity-editor:${{ steps.img.outputs.tag }}
-          customParameters: >
-            -enableCodeCoverage 
-            -coverageResultsPath ./Coverage 
-            -coverageOptions enableCyclomaticComplexity;generateHtmlReport
+          customParameters: -enableCodeCoverage -coverageResultsPath ./Coverage -coverageOptions enableCyclomaticComplexity;generateHtmlReport
 
       - name: Upload Test Results (XML, logs, coverage)
         if: always() && steps.mode.outputs.run_tests == 'true'
@@ -178,7 +157,7 @@ jobs:
         uses: dorny/test-reporter@main
         with:
           name: Unity PlayMode Tests
-          path: 'artifacts/**/*.xml'
+          path: 'artifacts/*.xml'
           reporter: dotnet-nunit
           fail-on-error: false
 
@@ -205,7 +184,6 @@ jobs:
           projectPath: ${{ env.PROJECT_PATH }}
           targetPlatform: ${{ steps.mode.outputs.target_platform }}
           buildName: ${{ env.BUILD_NAME }}
-          
       - name: Upload Build Artifact
         if: success() && steps.mode.outputs.run_build == 'true'
         uses: actions/upload-artifact@v4
