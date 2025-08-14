@@ -123,7 +123,12 @@ jobs:
           githubToken: ${{ secrets.GITHUB_TOKEN }}
           testMode: PlayMode
           artifactsPath: artifacts
-          customParameters: -enableCodeCoverage -coverageResultsPath ./Coverage -coverageOptions enableCyclomaticComplexity;generateHtmlReport
+          customParameters: >
+            -logFile -
+            -stackTraceLogType Full
+            -enableCodeCoverage 
+            -coverageResultsPath ./Coverage 
+            -coverageOptions enableCyclomaticComplexity;generateHtmlReport
 
       - name: Upload Test Results (XML, logs, coverage)
         if: always() && steps.mode.outputs.run_tests == 'true'
