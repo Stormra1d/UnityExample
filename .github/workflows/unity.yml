@@ -52,7 +52,14 @@ jobs:
         with:
           lfs: true
           fetch-depth: 1
-      
+      - name: Check disk usage
+        run: df -h
+      - name: Clean up disk space
+        run: |
+          docker system prune -af
+          sudo rm -rf /tmp/*
+          sudo apt-get clean
+          sudo rm -rf /usr/share/dotnet
       - name: Read Unity project version
         id: unity
         shell: bash
