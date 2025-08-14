@@ -92,10 +92,6 @@ public class MenuUITests : BasePlayModeTest
         var a = actionRef.action;
         Assert.IsTrue(a.enabled, "Pause action is not enabled (OnEnable may not have run)");
 
-        Debug.Log("PAUSE bindings:\n" + string.Join("\n", a.bindings.Select(b => $"{b.groups} | {b.path}")));
-        Debug.Log("PAUSE controls resolved:\n" + string.Join("\n", a.controls.Select(c => c.path)));
-
-
         Assert.IsNotNull(pauseMenu, "PauseMenuManager should be present");
         Assert.IsTrue(pauseMenu.pauseMenuUI.activeSelf, "Pause Menu UI should be active after ESC");
         Assert.AreEqual(0f, Time.timeScale, "Time should be stopped when paused");
@@ -130,9 +126,6 @@ public class MenuUITests : BasePlayModeTest
         InputSystem.QueueStateEvent(mouse, new MouseState { position = screenPosition, buttons = 0 });
         InputSystem.Update();
         yield return null;
-
-        Debug.Log($"Testing click at: {screenPosition}");
-        Debug.Log($"Button rectTransform.position: {rectTransform.position}");
 
         Assert.IsFalse(pauseMenu.pauseMenuUI.activeSelf, "Pause Menu UI should be inactive after unpausing");
         Assert.AreEqual(1f, Time.timeScale, "Time should be resumed after unpausing");

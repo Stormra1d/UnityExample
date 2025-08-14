@@ -176,7 +176,6 @@ public class EnemyAI : BaseEnemyAI
         float angle = Vector3.Angle(transform.forward, dirToPlayer);
         if (angle > fovAngle / 2f)
         {
-            Debug.Log($"E: PIS: Out of FOV");
             return false;
         }
 
