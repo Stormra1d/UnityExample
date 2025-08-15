@@ -29,6 +29,7 @@ public class EnemyAI : BaseEnemyAI
     protected override void Start()
     {
         base.Start();
+        agent.stoppingDistance = Mathf.Max(agent.stoppingDistance, 0.4f);
         SwitchState(State.Patrol);
     }
 
@@ -40,11 +41,14 @@ public class EnemyAI : BaseEnemyAI
             {
                 SwitchState(State.Chase);
             }
-            forgetTimer = 0f;
-            return;
-        }
 
-        if (currentState == State.Chase && !isGoingToLastKnownPosition)
+            if (isGoingToLastKnownPosition)
+            {
+                isGoingToLastKnownPosition = false;
+            }
+
+            forgetTimer = 0f;
+        } else if (currentState == State.Chase && !isGoingToLastKnownPosition)
         {
             forgetTimer += Time.deltaTime;
             if (forgetTimer >= forgetDuration)
@@ -150,7 +154,9 @@ public class EnemyAI : BaseEnemyAI
     {
         if (isGoingToLastKnownPosition)
         {
-            if (!agent.pathPending && agent.remainingDistance < 0.5f)
+            float arriveEps = agent.stoppingDistance + 0.05f;
+
+            if (!agent.pathPending && agent.remainingDistance < arriveEps)
             {
                 isGoingToLastKnownPosition = false;
                 SwitchState(State.Wait, 2f);

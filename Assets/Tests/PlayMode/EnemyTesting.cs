@@ -26,6 +26,7 @@ public class ZEnemyTesting : BasePlayModeTest
             SceneManager.LoadScene("GameAITest");
 
         yield return new WaitUntil(() => SceneManager.GetActiveScene().name == "GameAITest");
+        yield return new WaitUntil(() => NavMesh.CalculateTriangulation().vertices.Length > 0);
 
         yield return null;
         foreach (var spawner in Object.FindObjectsByType<CollectibleSpawner>(FindObjectsSortMode.None))
@@ -80,10 +81,18 @@ public class ZEnemyTesting : BasePlayModeTest
         ai.obstacleMask = LayerMask.GetMask("Movable");
 
         var agent = smartEnemy.GetComponent<NavMeshAgent>();
+        float arriveEps = agent.stoppingDistance + 0.05f;
+
+        yield return WaitUntilOrTimeout(
+            () => !ai.isGoingToLastKnownPosition ||
+            (!agent.pathPending && agent.remainingDistance <= arriveEps),
+            5f, "!ai.isGoingToLastKnownLocation for 5s");
+
         yield return null;
 
         agent.Warp(agent.transform.position);
-        yield return null;
+        yield return new WaitForSeconds(0.1f);
+        Assert.IsTrue(agent.isOnOffMeshLink || agent.isOnNavMesh, "Agent should be on NavMesh");
 
         smartEnemy.transform.rotation = Quaternion.LookRotation(player.transform.position - smartEnemy.transform.position);
         yield return new WaitForSeconds(0.25f);
@@ -91,9 +100,11 @@ public class ZEnemyTesting : BasePlayModeTest
         Assert.AreEqual(State.Chase, ai.currentState, "Enemy should be chasing the player");
 
         var wall = MakeWall(new Vector3(7.5f, 1.5f, 0), new Vector3(1f, 3f, 4f));
+        yield return new WaitForSeconds(0.1f);
 
         player.transform.position = new Vector3(10f, 0f, 0f);
-        yield return null;
+        Physics.SyncTransforms();
+        yield return new WaitForFixedUpdate();
 
         yield return new WaitUntil(() => !ai.PlayerInSight());
 
@@ -114,8 +125,14 @@ public class ZEnemyTesting : BasePlayModeTest
         var wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
         wall.transform.position = center;
         wall.transform.localScale = size;
-        var col = wall.GetComponent<Collider>();
-        col.gameObject.layer = LayerMask.NameToLayer("Movable");
+        wall.layer = LayerMask.NameToLayer("Movable");
+
+        var obstacle = wall.AddComponent<UnityEngine.AI.NavMeshObstacle>();
+        obstacle.shape = NavMeshObstacleShape.Box;
+        obstacle.carving = true;
+        obstacle.size = size;
+        obstacle.center = Vector3.zero;
+
         return wall;
     }
 
