@@ -14,8 +14,6 @@ public class SpikeTests
     private readonly List<GameObject> spawnedProjectiles = new();
     private readonly List<GameObject> spawnedCollectibles = new();
     private GameObject playerGameObject;
-    private readonly List<string> errorLogs = new();
-    private bool _logSubscribed;
 
     [UnitySetUp]
     public IEnumerator Setup()
@@ -23,13 +21,6 @@ public class SpikeTests
         SceneManager.LoadScene("PerformanceTestScene");
         while (!SceneManager.GetActiveScene().isLoaded)
             yield return null;
-
-        errorLogs.Clear();
-        if (!_logSubscribed)
-        {
-            Application.logMessageReceived += OnLogMessageReceived;
-            _logSubscribed = true;
-        }
 
         var playerPrefab = Resources.Load<GameObject>("Player");
         Assert.IsNotNull(playerPrefab, "Player prefab should exist");
@@ -45,33 +36,23 @@ public class SpikeTests
     [UnityTearDown]
     public IEnumerator Teardown()
     {
-        yield return new WaitForEndOfFrame();
+        yield return null;
         yield return new WaitForSeconds(0.1f);
 
-        System.Exception ex = null;
         try
         {
             DoCleanupNoYield();
         }
         catch (System.Exception e)
         {
-            ex = e;
+            Assert.Fail("Teardown exception: " + e);
         }
 
         yield return null;
-
-        if (ex != null)
-            Debug.LogError("Teardown exception: " + ex);
     }
 
     private void DoCleanupNoYield()
     {
-        if (_logSubscribed)
-        {
-            Application.logMessageReceived -= OnLogMessageReceived;
-            _logSubscribed = false;
-        }
-
         if (playerGameObject) Object.Destroy(playerGameObject);
 
         DestroyList(spawnedEnemies);
@@ -88,36 +69,6 @@ public class SpikeTests
         if (list == null) return;
         foreach (var go in list)
             if (go) Object.Destroy(go);
-    }
-
-    private void OnLogMessageReceived(string condition, string stackTrace, LogType type)
-    {
-        if ((type == LogType.Error || type == LogType.Exception) &&
-            errorLogs != null &&
-            !string.IsNullOrEmpty(condition))
-        {
-            errorLogs.Add($"{type}: {condition}\n{stackTrace ?? "No stack trace"}");
-        }
-    }
-
-    private void ReplayAndClearErrors()
-    {
-        if (_logSubscribed)
-        {
-            Application.logMessageReceived -= OnLogMessageReceived;
-            _logSubscribed = false;
-        }
-
-        if (errorLogs != null && errorLogs.Count > 0)
-        {
-            var snapshot = errorLogs.ToArray();
-            foreach (var e in snapshot)
-            {
-                if (!string.IsNullOrEmpty(e))
-                    Debug.LogError(e);
-            }
-            errorLogs.Clear();
-        }
     }
 
     /// <summary>
@@ -162,9 +113,7 @@ public class SpikeTests
             Measure.Custom("PositiveSpike_MemoryMB", Profiler.GetTotalAllocatedMemoryLong() / (1024.0f * 1024.0f));
         }
 
-        Debug.Log($"PositiveSpikeTest: {errorLogs.Count} errors / exceptions captured");
-        ReplayAndClearErrors();
-
+        LogAssert.NoUnexpectedReceived();
         yield return null;
     }
 
@@ -214,9 +163,7 @@ public class SpikeTests
             Measure.Custom("NegativeSpike_MemoryMB", Profiler.GetTotalAllocatedMemoryLong() / (1024.0f * 1024.0f));
         }
 
-        Debug.Log($"NegativeSpikeTest: {errorLogs.Count} errors / exceptions captured");
-        ReplayAndClearErrors();
-
+        LogAssert.NoUnexpectedReceived();
         yield return null;
     }
 
@@ -268,9 +215,7 @@ public class SpikeTests
             Measure.Custom("RepeatedSpike_MemoryMB", Profiler.GetTotalAllocatedMemoryLong() / (1024.0f * 1024.0f));
         }
 
-        Debug.Log($"RepeatedSpikeTest: {errorLogs.Count} errors / exceptions captured");
-        ReplayAndClearErrors();
-
+        LogAssert.NoUnexpectedReceived();
         yield return null;
     }
 }
