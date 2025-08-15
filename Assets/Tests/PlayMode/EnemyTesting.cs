@@ -41,7 +41,6 @@ public class ZEnemyTesting : BasePlayModeTest
         if (smartEnemy) Object.Destroy(smartEnemy);
         if (dumbEnemy) Object.Destroy(dumbEnemy);
 
-        yield return UnloadTestScenes();
         yield return null;
     }
 
@@ -108,20 +107,6 @@ public class ZEnemyTesting : BasePlayModeTest
 
         yield return WaitUntilOrTimeout(() => ai.currentState == State.Patrol, ai.forgetDuration + 3f, "ai.currentState == State.Patrol for 3s + forget duration");
         Assert.AreEqual(State.Patrol, ai.currentState, "Enemy should be on patrol");
-    }
-
-    private IEnumerator UnloadTestScenes()
-    {
-        string[] scenes = { "GameAITest", "Game", "MainMenu", "TestGame", "TestMainMenu" };
-        foreach (string scene in scenes)
-        {
-            Scene s = SceneManager.GetSceneByName(scene);
-            if (s.isLoaded)
-            {
-                AsyncOperation unload = SceneManager.UnloadSceneAsync(s);
-                yield return new WaitUntil(() => unload.isDone);
-            }
-        }
     }
 
     private GameObject MakeWall(Vector3 center, Vector3 size)
