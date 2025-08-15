@@ -4,7 +4,7 @@ using UnityEngine.AI;
 
 public class BaseEnemyAI : MonoBehaviour
 {
-    protected Transform player;
+    public Transform player;
     protected NavMeshAgent agent;
 
     public float contactDamage = 20f;

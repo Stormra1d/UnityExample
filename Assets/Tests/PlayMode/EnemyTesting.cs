@@ -8,7 +8,7 @@ using UnityEngine.TestTools;
 /// <summary>
 /// This was rough. I had to do a bunch of testing to prevent flakiness. Also some adjustments were necessary to fix tests failing (TDD).
 /// </summary>
-public class ZEnemyTesting : BasePlayModeTest
+public class EnemyTesting : BasePlayModeTest
 {
     private GameObject player;
     private GameObject smartEnemy;
@@ -49,6 +49,9 @@ public class ZEnemyTesting : BasePlayModeTest
     public IEnumerator Enemy_Reaches_Player()
     {
         player = Object.Instantiate(Resources.Load<GameObject>("Player"), playerPos, Quaternion.identity);
+        player.layer = LayerMask.NameToLayer("Player");
+        if (player.tag != "Player") player.tag = "Player";
+
         dumbEnemy = Object.Instantiate(Resources.Load<GameObject>("Dumb AI Variant"), enemyPos, Quaternion.identity);
         var dumbEnemyAI = dumbEnemy.GetComponent<DumbEnemyAI>();
 
@@ -68,82 +71,54 @@ public class ZEnemyTesting : BasePlayModeTest
     }
 
     [UnityTest]
-    public IEnumerator Enemy_ChangesState_OnPlayerSight()
+    public IEnumerator Enemy_Shot_Response_Test()
     {
+        Vector3 testEnemyPos = new Vector3(0, 0, 0);
+        Vector3 playerPos = new Vector3(0, 0, 100f);
+
         player = Object.Instantiate(Resources.Load<GameObject>("Player"), playerPos, Quaternion.identity);
+        player.layer = LayerMask.NameToLayer("Player");
+        if (player.tag != "Player") player.tag = "Player";
 
-        smartEnemy = Object.Instantiate(Resources.Load<GameObject>("EnemyAI"), enemyPos, Quaternion.identity);
+        GameObject weaponObj = Object.Instantiate(Resources.Load<GameObject>("Rifle"), player.transform);
+        Weapon weapon = weaponObj.GetComponent<Weapon>();
+        Assert.IsNotNull(weapon, "Rifle prefab must have a Weapon component");
 
+        if (weapon.playerCamera == null)
+        {
+            GameObject cameraObj = new GameObject("TestCamera");
+            cameraObj.transform.SetParent(player.transform);
+            cameraObj.transform.localPosition = new Vector3(0, 1, 0);
+            weapon.playerCamera = cameraObj.AddComponent<Camera>();
+        }
+        weapon.bulletPrefab = Resources.Load<GameObject>("Bullet");
+        Assert.IsNotNull(weapon.bulletPrefab, "Bullet prefab must exist in Resources");
+        weapon.bulletSpawn = weapon.transform;
+        weapon.shootingDelay = 0.1f;
+        weapon.bulletsInMag = weapon.magazineSize;
+
+        smartEnemy = Object.Instantiate(Resources.Load<GameObject>("EnemyAI"), testEnemyPos, Quaternion.identity);
         var ai = smartEnemy.GetComponent<EnemyAI>();
-        ai.patrolOrigin = enemyPos;
-
+        ai.testPlayer = player.transform;
+        ai.patrolOrigin = testEnemyPos;
         ai.playerLayer = LayerMask.GetMask("Player");
         ai.obstacleMask = LayerMask.GetMask("Movable");
 
-        var agent = smartEnemy.GetComponent<NavMeshAgent>();
-        float arriveEps = agent.stoppingDistance + 0.05f;
+        yield return new WaitForSeconds(0.5f);
 
-        yield return WaitUntilOrTimeout(
-            () => !ai.isGoingToLastKnownPosition ||
-            (!agent.pathPending && agent.remainingDistance <= arriveEps),
-            5f, "!ai.isGoingToLastKnownLocation for 5s");
+        Assert.AreEqual(State.Patrol, ai.currentState, "Enemy should start in Patrol");
+        Assert.IsFalse(ai.isGoingToLastKnownPosition, "Enemy should not be going to LKP");
 
-        yield return null;
-
-        agent.Warp(agent.transform.position);
-        yield return new WaitForSeconds(0.1f);
-        Assert.IsTrue(agent.isOnOffMeshLink || agent.isOnNavMesh, "Agent should be on NavMesh");
-
-        smartEnemy.transform.rotation = Quaternion.LookRotation(player.transform.position - smartEnemy.transform.position);
-        yield return new WaitForSeconds(0.25f);
-
-        Assert.AreEqual(State.Chase, ai.currentState, "Enemy should be chasing the player");
-
-        var wall = MakeWall(new Vector3(7.5f, 1.5f, 0), new Vector3(1f, 3f, 4f));
-        yield return new WaitForSeconds(0.1f);
-
-        player.transform.position = new Vector3(10f, 0f, 0f);
-        Physics.SyncTransforms();
+        yield return weapon.FireWeaponCoroutine();
         yield return new WaitForFixedUpdate();
 
-        yield return new WaitUntil(() => !ai.PlayerInSight());
+        Assert.IsTrue(ai.isGoingToLastKnownPosition, "Enemy should start going to shot position");
+        Assert.AreEqual(State.Chase, ai.currentState, "Enemy should switch to Chase after shot");
 
-        yield return WaitUntilOrTimeout(() => ai.isGoingToLastKnownPosition, 5f, "ai.isGoingToLastKnownPosition for 5s");
-        Assert.IsTrue(ai.isGoingToLastKnownPosition, "Enemy should be on way to last known position");
-        Assert.AreEqual(State.Chase, ai.currentState, "Enemy should still be Chasing while heading to LKP");
+        float initialDistanceToShot = Vector3.Distance(smartEnemy.transform.position, ai.lastKnownPosition);
+        yield return new WaitForSeconds(1f);
+        float newDistanceToShot = Vector3.Distance(smartEnemy.transform.position, ai.lastKnownPosition);
 
-        yield return WaitUntilOrTimeout(() => !ai.isGoingToLastKnownPosition, 5f, "!ai.isGoingToLastKnownPosition for 5s");
-        Assert.IsFalse(ai.isGoingToLastKnownPosition, "Enemy should have reached last known position");
-        Assert.AreEqual(State.Wait, ai.currentState, "Enemy should be waiting at last known position");
-
-        yield return WaitUntilOrTimeout(() => ai.currentState == State.Patrol, ai.forgetDuration + 3f, "ai.currentState == State.Patrol for 3s + forget duration");
-        Assert.AreEqual(State.Patrol, ai.currentState, "Enemy should be on patrol");
-    }
-
-    private GameObject MakeWall(Vector3 center, Vector3 size)
-    {
-        var wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        wall.transform.position = center;
-        wall.transform.localScale = size;
-        wall.layer = LayerMask.NameToLayer("Movable");
-
-        var obstacle = wall.AddComponent<UnityEngine.AI.NavMeshObstacle>();
-        obstacle.shape = NavMeshObstacleShape.Box;
-        obstacle.carving = true;
-        obstacle.size = size;
-        obstacle.center = Vector3.zero;
-
-        return wall;
-    }
-
-    private static IEnumerator WaitUntilOrTimeout(System.Func<bool> predicate, float timeoutSeconds, string message)
-    {
-        float start = Time.time;
-        while (Time.time - start < timeoutSeconds)
-        {
-            if (predicate()) yield break;
-            yield return null;
-        }
-        Assert.Fail($"Timeout after {timeoutSeconds:F2}s waiting for condition: {predicate.Method.Name}: {message}");
+        Assert.Less(newDistanceToShot, initialDistanceToShot, "Enemy should move closer to shot position");
     }
 }

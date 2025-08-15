@@ -1,12 +1,12 @@
 using UnityEngine;
 using UnityEngine.AI;
-using UnityEngine.Rendering;
 
 public enum State { Patrol, Wait, Chase }
 
 public class EnemyAI : BaseEnemyAI
 {
     public State currentState;
+    public Transform testPlayer;
 
     public Vector3 patrolOrigin = new Vector3(3, 0, 12);
     public float patrolRadius = 15f;
@@ -21,21 +21,32 @@ public class EnemyAI : BaseEnemyAI
 
     Vector3 targetPosition;
     float timer;
-    public float forgetTimer = 0f;
+
     public float forgetDuration = 3f;
-    Vector3 lastKnownPosition;
+
+    float lastSeenTime = float.NegativeInfinity;
+    public Vector3 lastKnownPosition;
     public bool isGoingToLastKnownPosition = false;
+    bool hasEverSeenPlayer = false;
 
     protected override void Start()
     {
         base.Start();
+        if (testPlayer == null)
+        {
+            GameObject playerObj = GameObject.FindWithTag("Player");
+            if (playerObj != null)
+                testPlayer = playerObj.transform;
+        }
         agent.stoppingDistance = Mathf.Max(agent.stoppingDistance, 0.4f);
         SwitchState(State.Patrol);
     }
 
     private void Update()
     {
-        if (PlayerInSight())
+        bool seen = PlayerInSight();
+
+        if (seen)
         {
             if (currentState != State.Chase)
             {
@@ -46,20 +57,17 @@ public class EnemyAI : BaseEnemyAI
             {
                 isGoingToLastKnownPosition = false;
             }
+        }
 
-            forgetTimer = 0f;
-        } else if (currentState == State.Chase && !isGoingToLastKnownPosition)
+        float timeSinceSeen = Time.time - lastSeenTime;
+        if (!seen && !isGoingToLastKnownPosition && hasEverSeenPlayer && timeSinceSeen >= forgetDuration)
         {
-            forgetTimer += Time.deltaTime;
-            if (forgetTimer >= forgetDuration)
+            float distanceToLKP = Vector3.Distance(transform.position, lastKnownPosition);
+            if (distanceToLKP > agent.stoppingDistance + 0.5f)
             {
                 isGoingToLastKnownPosition = true;
-                agent.SetDestination(lastKnownPosition);
+                bool ok = agent.SetDestination(lastKnownPosition);
             }
-        }
-        else if (forgetTimer != 0f)
-        {
-            forgetTimer = 0f;
         }
 
         switch (currentState)
@@ -71,26 +79,20 @@ public class EnemyAI : BaseEnemyAI
                 Wait();
                 break;
             case State.Chase:
-                Chase();
+                Chase(seen);
                 break;
         }
     }
 
     void SwitchState(State newState, float delay = 0f)
     {
-        bool wasChasing = currentState == State.Chase;
+        State prev = currentState;
         currentState = newState;
         timer = delay;
 
         if (newState == State.Patrol)
         {
             GenerateNewPatrolPoint();
-        }
-
-        if (newState != State.Chase && !wasChasing)
-        {
-            forgetTimer = 0f;
-            isGoingToLastKnownPosition = false;
         }
     }
 
@@ -150,30 +152,39 @@ public class EnemyAI : BaseEnemyAI
         }
     }
 
-    void Chase()
+    void Chase(bool seenNow)
     {
         if (isGoingToLastKnownPosition)
         {
             float arriveEps = agent.stoppingDistance + 0.05f;
-
-            if (!agent.pathPending && agent.remainingDistance < arriveEps)
+            if (!agent.pathPending && agent.remainingDistance <= arriveEps)
             {
                 isGoingToLastKnownPosition = false;
                 SwitchState(State.Wait, 2f);
             }
+            else
+            {
+                agent.speed = chaseSpeed;
+                bool ok = agent.SetDestination(lastKnownPosition);
+            }
             return;
         }
 
-        if (PlayerInSight())
+        if (seenNow)
         {
             agent.speed = chaseSpeed;
-            agent.SetDestination(player.position);
+            bool ok = agent.SetDestination(testPlayer.position);
         }
     }
 
     public bool PlayerInSight()
     {
-        Vector3 dirToPlayer = (player.position - transform.position);
+        if (testPlayer == null)
+        {
+            return false;
+        }
+
+        Vector3 dirToPlayer = (testPlayer.position - transform.position);
         if (dirToPlayer.magnitude > sightRange)
         {
             return false;
@@ -189,7 +200,9 @@ public class EnemyAI : BaseEnemyAI
         {
             if (hit.collider.CompareTag("Player"))
             {
-                SetLastKnownPosition(player.position);
+                SetLastKnownPosition(testPlayer.position);
+                lastSeenTime = Time.time;
+                hasEverSeenPlayer = true;
                 return true;
             }
         }
@@ -198,31 +211,28 @@ public class EnemyAI : BaseEnemyAI
 
     public void SetLastKnownPosition(Vector3 position)
     {
-        if (NavMesh.SamplePosition(position, out NavMeshHit hit, 1.0f, NavMesh.AllAreas))
-        {
-            lastKnownPosition = hit.position;
-        }
-        else
-        {
-            NavMesh.SamplePosition(position, out hit, 5.0f, NavMesh.AllAreas);
-            lastKnownPosition = hit.position;
-        }
+        bool ok = NavMesh.SamplePosition(position, out NavMeshHit hit, 1.0f, NavMesh.AllAreas);
+        if (!ok) ok = NavMesh.SamplePosition(position, out hit, 5.0f, NavMesh.AllAreas);
+        lastKnownPosition = hit.position;
     }
 
     void MoveTowards(Vector3 target, float speed)
     {
         agent.speed = speed;
-        agent.SetDestination(target);
+        bool ok = agent.SetDestination(target);
     }
 
     public void OnPlayerShot(Vector3 shotPosition)
     {
         if (currentState != State.Chase)
         {
-            lastKnownPosition = shotPosition;
+            bool ok = NavMesh.SamplePosition(shotPosition, out NavMeshHit hit, 5.0f, NavMesh.AllAreas);
+            lastKnownPosition = ok ? hit.position : shotPosition;
             isGoingToLastKnownPosition = true;
-            forgetTimer = Mathf.Infinity;
+            lastSeenTime = float.NegativeInfinity;
+            hasEverSeenPlayer = true;
             SwitchState(State.Chase);
+            agent.SetDestination(lastKnownPosition);
         }
     }
 }
