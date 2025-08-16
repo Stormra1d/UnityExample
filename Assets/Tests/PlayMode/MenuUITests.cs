@@ -45,7 +45,8 @@ public class MenuUITests : BasePlayModeTest
     [UnityTest]
     public IEnumerator MainMenu_LoadsGameScene_WhenStartGameButtonIsClicked()
     {
-        SceneManager.LoadScene("TestMainMenu");
+        var op = SceneManager.LoadSceneAsync("TestMainMenu", LoadSceneMode.Single);
+        while (!op.isDone) yield return null;
         yield return null;
 
         var startButton = GameObject.Find("Start")?.GetComponent<Button>();
@@ -60,7 +61,8 @@ public class MenuUITests : BasePlayModeTest
     [UnityTest]
     public IEnumerator Game_PausesWithEscapeAndResumesWithResumeButton()
     {
-        SceneManager.LoadScene("TestGame");
+        var op = SceneManager.LoadSceneAsync("TestGame", LoadSceneMode.Single);
+        while (!op.isDone) yield return null;
         yield return null;
 
         var playerInput = Object.FindAnyObjectByType<PlayerInput>();
@@ -73,6 +75,10 @@ public class MenuUITests : BasePlayModeTest
         InputUser.PerformPairingWithDevice(keyboard, playerInput.user);
         InputUser.PerformPairingWithDevice(mouse, playerInput.user);
         playerInput.SwitchCurrentControlScheme(keyboard, mouse);
+
+        InputSystem.Update();
+        yield return null;
+        InputSystem.Update();
 
         InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.Escape));
         InputSystem.Update();
@@ -134,7 +140,8 @@ public class MenuUITests : BasePlayModeTest
     [UnityTest]
     public IEnumerator Game_PausesWithPAndQuitsWithQuitButton()
     {
-        SceneManager.LoadScene("TestGame");
+        var op = SceneManager.LoadSceneAsync("TestGame", LoadSceneMode.Single);
+        while (!op.isDone) yield return null;
         yield return null;
 
         var keyboard = Keyboard.current ?? InputSystem.AddDevice<Keyboard>();
