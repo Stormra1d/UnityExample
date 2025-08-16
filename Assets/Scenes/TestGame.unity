@@ -2500,7 +2500,7 @@ MonoBehaviour:
   pauseMenuUI: {fileID: 1365919887}
   mainUI: {fileID: 117336526}
   player: {fileID: 1491221701}
-  pauseAction: {fileID: 4875442064285313217, guid: 595aebd014ad52f4ebfda919d54dc418, type: 3}
+  pauseAction: {fileID: 3435282331802316871, guid: 4419d82f33d36e848b3ed5af4c8da37e, type: 3}
 --- !u!1001 &2084445384
 PrefabInstance:
   m_ObjectHideFlags: 0

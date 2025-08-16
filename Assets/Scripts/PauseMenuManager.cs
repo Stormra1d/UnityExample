@@ -35,6 +35,7 @@ public class PauseMenuManager : MonoBehaviour
 
     private void OnPause(InputAction.CallbackContext context)
     {
+        Debug.Log("Pause action triggered!");
         if (isPaused)
             ResumeGame();
         else

@@ -19,21 +19,30 @@ public class MenuUITests : BasePlayModeTest
     {
         yield return null;
 
-        foreach (var device in InputSystem.devices)
-            if (device is Mouse && device != Mouse.current)
+        foreach (var device in InputSystem.devices.ToList())
+        {
+            if ((device is Mouse && device != Mouse.current) || (device is Keyboard && device != Keyboard.current))
                 InputSystem.RemoveDevice(device);
+        }
+
+        var playerInput = Object.FindAnyObjectByType<PlayerInput>();
+        if (playerInput != null)
+        {
+            playerInput.user.UnpairDevices();
+        }
     }
 
     [UnityTearDown]
     public IEnumerator Teardown()
     {
-        var keyboards = InputSystem.devices;
-        for (int i = keyboards.Count - 1; i >= 0; i--)
+        var playerInput = Object.FindAnyObjectByType<PlayerInput>();
+        if (playerInput != null)
+            playerInput.user.UnpairDevices();
+
+        foreach (var device in InputSystem.devices.ToList())
         {
-            if (keyboards[i] is Keyboard && keyboards[i] != Keyboard.current)
-            {
-                InputSystem.RemoveDevice(keyboards[i]);
-            }
+            if ((device is Mouse && device != Mouse.current) || (device is Keyboard && device != Keyboard.current))
+                InputSystem.RemoveDevice(device);
         }
 
         foreach (var device in InputSystem.devices)
@@ -67,6 +76,7 @@ public class MenuUITests : BasePlayModeTest
 
         var playerInput = Object.FindAnyObjectByType<PlayerInput>();
         Assert.IsNotNull(playerInput, "PlayerInput not found");
+        playerInput.SwitchCurrentActionMap("UI");
 
         var keyboard = Keyboard.current ?? InputSystem.AddDevice<Keyboard>();
         var mouse = Mouse.current ?? InputSystem.AddDevice<Mouse>();
@@ -82,12 +92,12 @@ public class MenuUITests : BasePlayModeTest
 
         InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.Escape));
         InputSystem.Update();
-
+        yield return new WaitForSeconds(0.1f);
         yield return null;
 
         InputSystem.QueueStateEvent(keyboard, new KeyboardState());
         InputSystem.Update();
-
+        yield return new WaitForSeconds(0.1f);
         yield return null;
 
         var pauseMenu = Object.FindAnyObjectByType<PauseMenuManager>();
@@ -121,16 +131,21 @@ public class MenuUITests : BasePlayModeTest
 
         Assert.IsNotNull(Object.FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>(), "Event System should be present");
 
+        Debug.Log($"PauseMenuManager found: {pauseMenu != null}, PauseAction: {pauseMenu?.pauseAction?.action?.name}, Enabled: {pauseMenu?.pauseAction?.action?.enabled}");
+
         InputSystem.QueueStateEvent(mouse, new MouseState { position = screenPosition });
         InputSystem.Update();
+        yield return new WaitForSeconds(0.1f);
         yield return null;
 
         InputSystem.QueueStateEvent(mouse, new MouseState { position = screenPosition, buttons = 1 });
         InputSystem.Update();
+        yield return new WaitForSeconds(0.1f);
         yield return null;
 
         InputSystem.QueueStateEvent(mouse, new MouseState { position = screenPosition, buttons = 0 });
         InputSystem.Update();
+        yield return new WaitForSeconds(0.1f);
         yield return null;
 
         Assert.IsFalse(pauseMenu.pauseMenuUI.activeSelf, "Pause Menu UI should be inactive after unpausing");
@@ -144,20 +159,36 @@ public class MenuUITests : BasePlayModeTest
         while (!op.isDone) yield return null;
         yield return null;
 
+        var playerInput = Object.FindAnyObjectByType<PlayerInput>();
+        Assert.IsNotNull(playerInput, "PlayerInput not found");
+        playerInput.SwitchCurrentActionMap("UI");
+
         var keyboard = Keyboard.current ?? InputSystem.AddDevice<Keyboard>();
+        var mouse = Mouse.current ?? InputSystem.AddDevice<Mouse>();
+
+        playerInput.user.UnpairDevices();
+        InputUser.PerformPairingWithDevice(keyboard, playerInput.user);
+        InputUser.PerformPairingWithDevice(mouse, playerInput.user);
+        playerInput.SwitchCurrentControlScheme(keyboard, mouse);
+
+        InputSystem.Update();
+        yield return null;
+
+        var pauseMenu = Object.FindAnyObjectByType<PauseMenuManager>();
+        Debug.Log($"PauseMenuManager found: {pauseMenu != null}, PauseAction: {pauseMenu?.pauseAction?.action?.name}, Enabled: {pauseMenu?.pauseAction?.action?.enabled}");
+
         InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.P));
         InputSystem.Update();
-
+        yield return new WaitForSeconds(0.1f);
         yield return null;
 
         InputSystem.QueueStateEvent(keyboard, new KeyboardState());
         InputSystem.Update();
-
+        yield return new WaitForSeconds(0.1f);
         yield return null;
 
-        var pauseMenu = Object.FindAnyObjectByType<PauseMenuManager>();
         Assert.IsNotNull(pauseMenu, "PauseMenuManager should be present");
-        Assert.IsTrue(pauseMenu.pauseMenuUI.activeSelf, "Pause Menu UI should be active after ESC");
+        Assert.IsTrue(pauseMenu.pauseMenuUI.activeSelf, "Pause Menu UI should be active after P");
         Assert.AreEqual(0f, Time.timeScale, "Time should be stopped when paused");
 
         var quitToMenuButton = GameObject.Find("Menu Button")?.GetComponent<Button>();
