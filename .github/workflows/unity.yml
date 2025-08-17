@@ -113,6 +113,26 @@ jobs:
           done
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          
+      - name: Build
+        if: steps.mode.outputs.run_build == 'true'
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE:  ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL:    ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: ${{ env.PROJECT_PATH }}
+          targetPlatform: ${{ steps.mode.outputs.target_platform }}
+          buildName: ${{ env.BUILD_NAME }}
+          
+      - name: Upload Build Artifact
+        if: success() && steps.mode.outputs.run_build == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ steps.mode.outputs.target_platform }}
+          path: build/**/*
+          retention-days: 30
 
       - name: Run PlayMode Tests
         if: steps.mode.outputs.run_tests == 'true'
@@ -148,37 +168,6 @@ jobs:
           path: 'artifacts/*.xml'
           reporter: dotnet-nunit
           fail-on-error: false
-
-      - name: Free Disk Space before Build
-        if: steps.mode.outputs.run_build == 'true'
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          android: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: false
-          dotnet: false
-          tool-cache: false
-          
-      - name: Build
-        if: steps.mode.outputs.run_build == 'true'
-        uses: game-ci/unity-builder@v4
-        env:
-          UNITY_LICENSE:  ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL:    ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          projectPath: ${{ env.PROJECT_PATH }}
-          targetPlatform: ${{ steps.mode.outputs.target_platform }}
-          buildName: ${{ env.BUILD_NAME }}
-      - name: Upload Build Artifact
-        if: success() && steps.mode.outputs.run_build == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-${{ steps.mode.outputs.target_platform }}
-          path: build/**/*
-          retention-days: 30
       
       - name: Create GitHub Release
         if: success() && steps.mode.outputs.run_build == 'true' && steps.mode.outputs.create_release == 'true'
