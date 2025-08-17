@@ -75,33 +75,6 @@ jobs:
           restore-keys: |
             Library-${{ runner.os }}-Unity${{ steps.unity.outputs.version }}-
 
-      - name: Set mode flags
-        id: mode
-        shell: bash
-        run: |
-          # Defaults: PR = tests only; push main = tests+build; manual = use inputs
-          run_tests="true"
-          run_build="false"
-          create_release="false"
-          target_platform="StandaloneWindows64"
-
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            run_build="false"
-          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
-            run_build="true"
-            create_release="true"
-          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            run_tests="${{ github.event.inputs.run_tests }}"
-            run_build="${{ github.event.inputs.run_build }}"
-            create_release="${{ github.event.inputs.create_release }}"
-            target_platform="${{ github.event.inputs.target_platform }}"
-          fi
-
-          echo "run_tests=${run_tests}"        >> $GITHUB_OUTPUT
-          echo "run_build=${run_build}"        >> $GITHUB_OUTPUT
-          echo "create_release=${create_release}" >> $GITHUB_OUTPUT
-          echo "target_platform=${target_platform}" >> $GITHUB_OUTPUT
-
       - name: Debug license is present (length only)
         run: |
           echo "UNITY_LICENSE length: ${#UNITY_LICENSE}"
