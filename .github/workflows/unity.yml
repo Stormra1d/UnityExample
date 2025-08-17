@@ -75,6 +75,21 @@ jobs:
           restore-keys: |
             Library-${{ runner.os }}-Unity${{ steps.unity.outputs.version }}-
 
+      - name: Set mode flags
+        id: mode
+        shell: bash
+        run: |
+          # Defaults
+          run_tests="true"
+          run_build="true"
+          create_release="true"
+          target_platform="StandaloneWindows64"
+
+          echo "run_tests=${run_tests}"        >> $GITHUB_OUTPUT
+          echo "run_build=${run_build}"        >> $GITHUB_OUTPUT
+          echo "create_release=${create_release}" >> $GITHUB_OUTPUT
+          echo "target_platform=${target_platform}" >> $GITHUB_OUTPUT
+
       - name: Debug license is present (length only)
         run: |
           echo "UNITY_LICENSE length: ${#UNITY_LICENSE}"
