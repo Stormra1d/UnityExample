@@ -21,8 +21,6 @@ public class MenuUITests : BasePlayModeTest
     [UnitySetUp]
     public override IEnumerator BaseSetUp()
     {
-        yield return base.BaseSetUp();
-
         inputFixture.Setup();
 
         testKeyboard = InputSystem.AddDevice<Keyboard>();
@@ -30,6 +28,9 @@ public class MenuUITests : BasePlayModeTest
         InputSystem.Update();
 
         yield return null;
+
+        yield return base.BaseSetUp();
+
         yield return null;
     }
 
@@ -125,6 +126,9 @@ public class MenuUITests : BasePlayModeTest
         var playerInput = Object.FindAnyObjectByType<PlayerInput>();
         Assert.IsNotNull(playerInput, "PlayerInput not found");
 
+        playerInput.neverAutoSwitchControlSchemes = true;
+        playerInput.actions.Disable();
+
         playerInput.user.UnpairDevices();
 
         InputUser.PerformPairingWithDevice(testKeyboard, playerInput.user);
@@ -136,6 +140,9 @@ public class MenuUITests : BasePlayModeTest
         {
             playerInput.SwitchCurrentActionMap("Player");
         }
+
+        playerInput.actions.Enable();
+        InputSystem.Update();
 
         yield return null;
         yield return null;
