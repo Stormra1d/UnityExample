@@ -25,6 +25,10 @@ public class MenuUITests : BasePlayModeTest
 
         inputFixture.Setup();
 
+        testKeyboard = InputSystem.AddDevice<Keyboard>();
+        testMouse = InputSystem.AddDevice<Mouse>();
+        InputSystem.Update();
+
         yield return null;
         yield return null;
     }
@@ -35,6 +39,9 @@ public class MenuUITests : BasePlayModeTest
         yield return base.BaseTearDown();
 
         inputFixture.TearDown();
+
+        testKeyboard = null;
+        testMouse = null;
 
         yield return null;
     }
@@ -120,9 +127,6 @@ public class MenuUITests : BasePlayModeTest
 
         playerInput.user.UnpairDevices();
 
-        testKeyboard = InputSystem.AddDevice<Keyboard>();
-        testMouse = InputSystem.AddDevice<Mouse>();
-
         InputUser.PerformPairingWithDevice(testKeyboard, playerInput.user);
         InputUser.PerformPairingWithDevice(testMouse, playerInput.user);
 
@@ -139,17 +143,14 @@ public class MenuUITests : BasePlayModeTest
 
     private IEnumerator TriggerKeyPressSync(Key key, string keyName)
     {
-        Debug.Log($"Triggering {keyName} key press");
-
-        var testKeyboard = InputSystem.devices.OfType<Keyboard>().FirstOrDefault();
         Assert.IsNotNull(testKeyboard, "Test keyboard not found");
 
         inputFixture.Press(testKeyboard[key]);
-
+        InputSystem.Update();
         yield return null;
 
         inputFixture.Release(testKeyboard[key]);
-
+        InputSystem.Update();
         yield return null;
     }
 
