@@ -40,6 +40,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "Pause",
+                    "type": "Button",
+                    "id": "a8eac373-b0ee-40d2-a82a-df7cbae5d308",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -218,27 +227,10 @@
                     "action": "Sprint",
                     "isComposite": false,
                     "isPartOfComposite": false
-                }
-            ]
-        },
-        {
-            "name": "UI",
-            "id": "6dd66c13-10f9-4274-b461-ced9469db007",
-            "actions": [
-                {
-                    "name": "Pause",
-                    "type": "Button",
-                    "id": "bbc6b18d-b8a1-4f31-8aac-8ef5819bdd7a",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                }
-            ],
-            "bindings": [
+                },
                 {
                     "name": "",
-                    "id": "d45f9984-2dae-4f86-8cd9-81bab843dbce",
+                    "id": "1574f9d2-0aa8-4dcf-89f6-bad75a2bc9bb",
                     "path": "<Keyboard>/p",
                     "interactions": "",
                     "processors": "",
@@ -249,7 +241,7 @@
                 },
                 {
                     "name": "",
-                    "id": "e494cc59-9575-42a1-b277-43b547fce88c",
+                    "id": "c752e707-61c6-4481-9283-bcb3440de27b",
                     "path": "<Keyboard>/escape",
                     "interactions": "",
                     "processors": "",
