@@ -14,53 +14,36 @@ using UnityEngine.UI;
 /// </summary>
 public class MenuUITests : BasePlayModeTest
 {
+    private readonly InputTestFixture inputFixture = new InputTestFixture();
     private Keyboard testKeyboard;
     private Mouse testMouse;
 
     [UnitySetUp]
-    public IEnumerator SetUp()
+    public override IEnumerator BaseSetUp()
     {
-        Time.timeScale = 1f;
+        yield return base.BaseSetUp();
+
+        inputFixture.Setup();
 
         yield return null;
         yield return null;
-
-        CleanupInputDevices();
     }
 
     [UnityTearDown]
-    public IEnumerator TearDown()
+    public override IEnumerator BaseTearDown()
     {
-        Time.timeScale = 1f;
+        yield return base.BaseTearDown();
 
-        CleanupInputDevices();
-
-        foreach (var device in InputSystem.devices)
-            InputSystem.ResetDevice(device);
+        inputFixture.TearDown();
 
         yield return null;
-    }
-
-    private void CleanupInputDevices()
-    {
-        if (testKeyboard != null && testKeyboard.added)
-        {
-            InputSystem.RemoveDevice(testKeyboard);
-            testKeyboard = null;
-        }
-
-        if (testMouse != null && testMouse.added)
-        {
-            InputSystem.RemoveDevice(testMouse);
-            testMouse = null;
-        }
     }
 
     [UnityTest]
     public IEnumerator MainMenu_LoadsGameScene_WhenStartGameButtonIsClicked()
     {
-        var op = SceneManager.LoadSceneAsync("TestMainMenu", LoadSceneMode.Single);
-        while (!op.isDone) yield return null;
+        yield return LoadTestScene("TestMainMenu", LoadSceneMode.Single);
+
         yield return null;
         yield return null;
 
@@ -76,8 +59,7 @@ public class MenuUITests : BasePlayModeTest
     [UnityTest]
     public IEnumerator Game_PausesWithEscapeAndResumesWithResumeButton()
     {
-        var op = SceneManager.LoadSceneAsync("TestGame", LoadSceneMode.Single);
-        while (!op.isDone) yield return null;
+        yield return LoadTestScene("TestGame", LoadSceneMode.Single);
 
         yield return null;
         yield return null;
@@ -105,8 +87,7 @@ public class MenuUITests : BasePlayModeTest
     [UnityTest]
     public IEnumerator Game_PausesWithPAndQuitsWithQuitButton()
     {
-        var op = SceneManager.LoadSceneAsync("TestGame", LoadSceneMode.Single);
-        while (!op.isDone) yield return null;
+        yield return LoadTestScene("TestGame", LoadSceneMode.Single);
 
         yield return null;
         yield return null;
@@ -142,46 +123,32 @@ public class MenuUITests : BasePlayModeTest
         testKeyboard = InputSystem.AddDevice<Keyboard>();
         testMouse = InputSystem.AddDevice<Mouse>();
 
-        yield return null;
-        InputSystem.Update();
-        yield return null;
-
         InputUser.PerformPairingWithDevice(testKeyboard, playerInput.user);
         InputUser.PerformPairingWithDevice(testMouse, playerInput.user);
 
-        playerInput.SwitchCurrentControlScheme(testKeyboard, testMouse);
+        playerInput.SwitchCurrentControlScheme("KeyboardMouse", testKeyboard, testMouse);
 
         if (playerInput.actions.actionMaps.Any(map => map.name == "Player"))
         {
             playerInput.SwitchCurrentActionMap("Player");
         }
 
-        InputSystem.Update();
         yield return null;
-        InputSystem.Update();
         yield return null;
-
-        var pauseMenu = Object.FindAnyObjectByType<PauseMenuManager>();
-        if (pauseMenu?.pauseAction?.action != null)
-        {
-            var action = pauseMenu.pauseAction.action;
-        }
     }
 
     private IEnumerator TriggerKeyPressSync(Key key, string keyName)
     {
-        InputSystem.QueueStateEvent(testKeyboard, new KeyboardState());
-        InputSystem.Update();
+        Debug.Log($"Triggering {keyName} key press");
+
+        var testKeyboard = InputSystem.devices.OfType<Keyboard>().FirstOrDefault();
+        Assert.IsNotNull(testKeyboard, "Test keyboard not found");
+
+        inputFixture.Press(testKeyboard[key]);
+
         yield return null;
 
-        var keyboardState = new KeyboardState(key);
-        InputSystem.QueueStateEvent(testKeyboard, keyboardState);
-        InputSystem.Update();
-
-        yield return null;
-
-        InputSystem.QueueStateEvent(testKeyboard, new KeyboardState());
-        InputSystem.Update();
+        inputFixture.Release(testKeyboard[key]);
 
         yield return null;
     }
@@ -194,7 +161,6 @@ public class MenuUITests : BasePlayModeTest
         resumeButton.onClick.Invoke();
         yield return new WaitForSeconds(0.1f);
     }
-
 
     private IEnumerator WaitForCondition(System.Func<bool> condition, float timeout, string description)
     {
