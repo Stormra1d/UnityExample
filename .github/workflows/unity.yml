@@ -138,7 +138,7 @@ jobs:
           githubToken: ${{ secrets.GITHUB_TOKEN }}
           testMode: PlayMode
           artifactsPath: artifacts
-          customParameters: -enableCodeCoverage -coverageResultsPath ./Coverage -coverageOptions enableCyclomaticComplexity;generateHtmlReport
+          customParameters: -enableCodeCoverage -coverageResultsPath ./Coverage -coverageOptions enableCyclomaticComplexity;generateHtmlReport -testCategory "!SkipCI"
 
       - name: Upload Test Results (XML, logs, coverage)
         if: always() && steps.mode.outputs.run_tests == 'true'
