@@ -146,7 +146,21 @@ jobs:
           githubToken: ${{ secrets.GITHUB_TOKEN }}
           testMode: PlayMode
           artifactsPath: artifacts
-          customParameters: -enableCodeCoverage -coverageResultsPath ./Coverage -coverageOptions enableCyclomaticComplexity;generateHtmlReport -testCategory "!SkipCI"
+          customParameters: -enableCodeCoverage -coverageResultsPath ./Coverage -coverageOptions enableCyclomaticComplexity;generateHtmlReport -testCategory "!SkipCI" -testResults artifacts/test-results.xml -performanceTestReportPath artifacts/performance-report.html -enableProfiler
+
+      - name: Parse Performance Results
+        if: always() && steps.mode.outputs.run_tests == 'true'
+        run: |
+          sudo apt-get install -y jq
+          if [ -f artifacts/test-results.json ]; then
+            jq '.[] | select(.SampleGroups != null) | .SampleGroups[] | {Test: .TestName, Metric: .Name, Median: .Median, Unit: .SampleUnit}' artifacts/test-results.json > artifacts/performance-summary.txt
+            echo "## Performance Test Summary" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat artifacts/performance-summary.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No performance test results found" >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Upload Test Results (XML, logs, coverage)
         if: always() && steps.mode.outputs.run_tests == 'true'
@@ -165,7 +179,7 @@ jobs:
         uses: dorny/test-reporter@main
         with:
           name: Unity PlayMode Tests
-          path: 'artifacts/*.xml'
+          path: 'artifacts/test-results.xml'
           reporter: dotnet-nunit
           fail-on-error: false
       

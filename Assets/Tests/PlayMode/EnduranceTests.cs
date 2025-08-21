@@ -9,9 +9,6 @@ using UnityEngine.Profiling;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
-/// <summary>
-/// Here I had a better system. Across all Performance Tests I think I'm pretty consistent with what I put in Setup/Teardown and how I structure my tests. These are the ones that work best I think.
-/// </summary>
 [Category("Endurance")]
 public class EnduranceTests
 {
@@ -31,7 +28,7 @@ public class EnduranceTests
         Application.logMessageReceived += OnLogMessageReceived;
 
         var playerPrefab = Resources.Load<GameObject>("Player");
-        Assert.IsNotNull(playerPrefab);
+        Assert.IsNotNull(playerPrefab, "Player prefab not found");
         playerGameObject = Object.Instantiate(playerPrefab, Vector3.zero, Quaternion.identity);
 
         spawnedEnemies.Clear();
@@ -66,10 +63,6 @@ public class EnduranceTests
         }
     }
 
-    /// <summary>
-    /// Not emulating gameplay well enough
-    /// </summary>
-    /// <returns></returns>
     [UnityTest, Performance]
     [Timeout(1000000)]
     public IEnumerator GeneralEnduranceTest()
@@ -81,6 +74,10 @@ public class EnduranceTests
         var enemyPrefab = Resources.Load<GameObject>("EnemyAI");
         var bulletPrefab = Resources.Load<GameObject>("Bullet");
         var collectiblePrefab = Resources.Load<GameObject>("RedRuby");
+
+        Assert.IsNotNull(enemyPrefab, "EnemyAI prefab not found");
+        Assert.IsNotNull(bulletPrefab, "Bullet prefab not found");
+        Assert.IsNotNull(collectiblePrefab, "RedRuby prefab not found");
 
         for (int i = 0; i < numEnemies; i++)
         {
@@ -100,34 +97,50 @@ public class EnduranceTests
             spawnedCollectibles.Add(Object.Instantiate(collectiblePrefab, Random.insideUnitSphere * 10f, Quaternion.identity));
         }
 
-        float duration = 600f;
-        float elapsed = 0f;
-        List<float> fpsSamples = new();
-        List<float> memorySamples = new();
-
-        while (elapsed < duration)
+        using (Measure.Frames().WarmupCount(10).MeasurementCount(20).Scope())
+        using (Measure.Scope("MemoryUsage"))
         {
-            yield return new WaitForSeconds(1f);
-            fpsSamples.Add(1.0f / Time.deltaTime);
-            memorySamples.Add(Profiler.GetTotalAllocatedMemoryLong() / (1024.0f * 1024.0f));
-            elapsed += 1f;
+            float duration = 60f;
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                foreach (var enemy in spawnedEnemies)
+                {
+                    if (enemy)
+                    {
+                        var navAgent = enemy.GetComponent<NavMeshAgent>();
+                        if (navAgent)
+                        {
+                            navAgent.SetDestination(playerGameObject.transform.position);
+                        }
+                    }
+                }
+                foreach (var proj in spawnedProjectiles)
+                {
+                    if (proj)
+                    {
+                        proj.transform.Translate(Vector3.forward * Time.deltaTime * 5f);
+                    }
+                }
+                Measure.Custom(new SampleGroup("MemoryUsage", SampleUnit.Megabyte), Profiler.GetTotalAllocatedMemoryLong() / (1024f * 1024f));
+                yield return new WaitForSeconds(0.1f);
+                elapsed += 0.1f;
+            }
         }
 
-        Debug.Log($"GeneralEnduranceTest: Errors {errorLogs.Count} noted");
-
+        Assert.IsEmpty(errorLogs, $"Errors detected: {string.Join("\n", errorLogs)}");
         yield return null;
     }
 
-    /// <summary>
-    /// Not emulating gameplay well enough. First test seems like this and the 4th? Like where is the difference
-    /// </summary>
-    /// <returns></returns>
     [UnityTest, Performance]
     [Timeout(1000000)]
     public IEnumerator MemoryLeakTest()
     {
         int numEnemies = 50;
         var enemyPrefab = Resources.Load<GameObject>("EnemyAI");
+
+        Assert.IsNotNull(enemyPrefab, "EnemyAI prefab not found");
+
         for (int i = 0; i < numEnemies; i++)
         {
             Vector3 pos = new Vector3(Random.Range(-20, 20), 0, Random.Range(-20, 20));
@@ -138,109 +151,118 @@ public class EnduranceTests
             }
         }
 
-        float duration = 600f;
-        float elapsed = 0f;
-        List<float> memorySamples = new();
-
-        while (elapsed < duration)
+        using (Measure.Scope("MemoryUsage"))
         {
-            yield return new WaitForSeconds(1f);
-            memorySamples.Add(Profiler.GetTotalAllocatedMemoryLong() / (1024.0f * 1024.0f));
-            elapsed += 1f;
-
-            if (Random.value < 0.02f)
+            float duration = 60f;
+            float elapsed = 0f;
+            float initialMemory = Profiler.GetTotalAllocatedMemoryLong() / (1024f * 1024f);
+            while (elapsed < duration)
             {
-                int index = Random.Range(0, spawnedEnemies.Count);
-                Object.Destroy(spawnedEnemies[index]);
-                Vector3 randomPos = Random.insideUnitSphere * 20f;
-                randomPos.y = 0;
-
-                NavMeshHit hit;
-                if (NavMesh.SamplePosition(randomPos, out hit, 2.0f, NavMesh.AllAreas))
+                if (Random.value < 0.05f)
                 {
-                    spawnedEnemies[index] = Object.Instantiate(enemyPrefab, hit.position, Quaternion.identity);
+                    int index = Random.Range(0, spawnedEnemies.Count);
+                    if (spawnedEnemies[index])
+                    {
+                        Object.Destroy(spawnedEnemies[index]);
+                        Vector3 pos = new Vector3(Random.Range(-20, 20), 0, Random.Range(-20, 20));
+                        if (NavMesh.SamplePosition(pos, out NavMeshHit hit, 2.0f, NavMesh.AllAreas))
+                        {
+                            spawnedEnemies[index] = Object.Instantiate(enemyPrefab, hit.position, Quaternion.identity);
+                        }
+                    }
                 }
+                Measure.Custom(new SampleGroup("MemoryUsage", SampleUnit.Megabyte), Profiler.GetTotalAllocatedMemoryLong() / (1024f * 1024f));
+                yield return new WaitForSeconds(0.1f);
+                elapsed += 0.1f;
             }
-        }
 
-        float delta = memorySamples.Last() - memorySamples.First();
-        Debug.Log($"MemoryLeakTest: Start: {memorySamples.First():F2} MB, End: {memorySamples.Last():F2} MB, Delta: {delta:F2} MB");
-        if (delta > 10)
-        {
-            Debug.LogWarning("Potential Memory Leak detected");
+            float finalMemory = Profiler.GetTotalAllocatedMemoryLong() / (1024f * 1024f);
+            float delta = finalMemory - initialMemory;
+            Assert.LessOrEqual(delta, 5f, $"Memory leak detected: Delta {delta:F2} MB exceeds 5 MB");
         }
 
         yield return null;
     }
 
-    /// <summary>
-    /// Seems pretty irrelevant for this scope
-    /// </summary>
-    /// <returns></returns>
-    [UnityTest, Performance]
-    [Timeout(1000000)]
-    public IEnumerator ResourceLeakTest()
-    {
-        List<Texture2D> textures = new();
-        int loops = 1000;
-
-        for (int i = 0; i < loops; i++)
-        {
-            Texture2D texture = new Texture2D(512, 512);
-            textures.Add(texture);
-            if (i % 10 == 0)
-                yield return null;
-        }
-
-        foreach (var texture in textures)
-            Object.Destroy(texture);
-
-        float memory = Profiler.GetTotalAllocatedMemoryLong() / (1024.0f * 1024.0f);
-        Debug.Log($"ResourceLeakTEst created/destroyed {loops} textures. Mem: {memory:F2} MB");
-        yield return null;
-    }
-
-    /// <summary>
-    /// Yeah this is just 1:1 the same as the first? Maybe research where the difference is between 1) and 2/4. Like yeah, we do 
-    /// avg and the whole degredation thing but the test itself is pretty much identical?
-    /// </summary>
-    /// <returns></returns>
     [UnityTest, Performance]
     [Timeout(1000000)]
     public IEnumerator PerformanceDegredationTest()
     {
-        int numEnemies = 50;
         var enemyPrefab = Resources.Load<GameObject>("EnemyAI");
-        for (int i = 0; i < numEnemies; i++)
+        Assert.IsNotNull(enemyPrefab, "EnemyAI prefab not found");
+
+        var frameGroup = new SampleGroup(name: "FrameTime", unit: SampleUnit.Millisecond, increaseIsBetter: false);
+
+        using (Measure.Frames().SampleGroup(frameGroup).WarmupCount(10).MeasurementCount(60).Scope())
+        {
+            float duration = 60f;
+            float elapsed = 0f;
+            int maxEnemies = 100;
+            int enemiesPerStep = 10;
+            while (elapsed < duration)
+            {
+                if (elapsed % 10f < 0.1f && spawnedEnemies.Count < maxEnemies)
+                {
+                    for (int i = 0; i < enemiesPerStep; i++)
+                    {
+                        Vector3 pos = new Vector3(Random.Range(-20, 20), 0, Random.Range(-20, 20));
+                        if (NavMesh.SamplePosition(pos, out NavMeshHit hit, 2.0f, NavMesh.AllAreas))
+                        {
+                            spawnedEnemies.Add(Object.Instantiate(enemyPrefab, hit.position, Quaternion.identity));
+                        }
+                    }
+                }
+                foreach (var enemy in spawnedEnemies)
+                {
+                    if (enemy)
+                    {
+                        var navAgent = enemy.GetComponent<NavMeshAgent>();
+                        if (navAgent)
+                        {
+                            navAgent.SetDestination(playerGameObject.transform.position);
+                        }
+                    }
+                }
+                yield return null;
+                elapsed += Time.deltaTime;
+            }
+        }
+
+        var fpsGroup = PerformanceTest.GetSampleGroup("FrameTime") ?? PerformanceTest.GetSampleGroup("Time");
+        Assert.NotNull(fpsGroup, "No frame time sample group found");
+        Assert.NotNull(fpsGroup, "FrameTime sample group not found");
+        Assert.LessOrEqual(fpsGroup.Median, 16.67f,$"Median frame time {fpsGroup.Median:F2} ms exceeds 16.67 ms (60 FPS)");
+    }
+
+    [UnityTest, Performance]
+    [Timeout(1000000)]
+    public IEnumerator RenderingPerformanceTest()
+    {
+        var enemyPrefab = Resources.Load<GameObject>("EnemyAI");
+        Assert.IsNotNull(enemyPrefab, "EnemyAI prefab not found");
+
+        for (int i = 0; i < 50; i++)
         {
             Vector3 pos = new Vector3(Random.Range(-20, 20), 0, Random.Range(-20, 20));
-            NavMeshHit hit;
-            if (NavMesh.SamplePosition(pos, out hit, 2.0f, NavMesh.AllAreas))
+            if (NavMesh.SamplePosition(pos, out NavMeshHit hit, 2.0f, NavMesh.AllAreas))
             {
                 spawnedEnemies.Add(Object.Instantiate(enemyPrefab, hit.position, Quaternion.identity));
             }
         }
 
-        float duration = 600f;
-        float elapsed = 0f;
-        List<float> fpsSamples = new();
-
-        while (elapsed < duration)
+        using (Measure.ProfilerMarkers(new[] { "Camera.Render" }))
         {
-            yield return new WaitForSeconds(1f);
-            fpsSamples.Add(1.0f / Time.deltaTime);
-            elapsed += 1f;
+            var camera = Camera.main;
+            if (camera)
+            {
+                camera.transform.RotateAround(Vector3.zero, Vector3.up, 10f * Time.deltaTime);
+            }
+            yield return new WaitForSeconds(5f);
         }
 
-        float startAvg = fpsSamples.Take(60).Average();
-        float endAvg = fpsSamples.Skip(fpsSamples.Count - 60).Average();
-
-        Debug.Log($"PerformanceDegredation: Start FPS: {startAvg:F2}, End: {endAvg:F2}");
-        if (endAvg < startAvg * 0.75)
-        {
-            Debug.LogWarning("Performance degredation detected");
-        }
-
+        var renderData = PerformanceTest.GetSampleGroup("Camera.Render");
+        Assert.NotNull(renderData, "Camera.Render sample group not found");
+        Assert.LessOrEqual(renderData.Median, 0.1f, $"Camera.Render median time {renderData.Median:F2} ms too high");
         yield return null;
     }
 }

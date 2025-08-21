@@ -5,16 +5,17 @@ using UnityEngine.TestTools;
 using Unity.PerformanceTesting;
 using UnityEngine.SceneManagement;
 using System.Collections.Generic;
-using System.Linq;
+using UnityEngine.AI;
 using UnityEngine.Profiling;
-using System.Diagnostics;
 
+[Category("Endurance")]
 public class LoadTesting
 {
     private GameObject playerGameObject;
     private readonly string playerPrefabPath = "Player";
     private readonly string enemyPrefabPath = "EnemyAI";
     private List<GameObject> spawnedEnemies = new();
+    private List<string> errorLogs = new();
 
     [UnitySetUp]
     public IEnumerator Setup()
@@ -22,9 +23,12 @@ public class LoadTesting
         SceneManager.LoadScene("PerformanceTestScene");
         yield return null;
 
+        errorLogs.Clear();
+        Application.logMessageReceived += OnLogMessageReceived;
+
         var playerPrefab = Resources.Load<GameObject>(playerPrefabPath);
         Assert.IsNotNull(playerPrefab, "Player prefab should be available");
-        playerGameObject = GameObject.Instantiate(playerPrefab, Vector3.zero, Quaternion.identity);
+        playerGameObject = Object.Instantiate(playerPrefab, Vector3.zero, Quaternion.identity);
 
         spawnedEnemies.Clear();
         yield return null;
@@ -33,19 +37,28 @@ public class LoadTesting
     [UnityTearDown]
     public IEnumerator Teardown()
     {
-        if (playerGameObject) GameObject.DestroyImmediate(playerGameObject);
+        Application.logMessageReceived -= OnLogMessageReceived;
+
+        if (playerGameObject) Object.DestroyImmediate(playerGameObject);
         foreach (var enemy in spawnedEnemies)
         {
             if (enemy)
             {
-                GameObject.DestroyImmediate(enemy);
+                Object.DestroyImmediate(enemy);
             }
         }
         spawnedEnemies.Clear();
         yield return null;
     }
 
+    private void OnLogMessageReceived(string condition, string stackTrace, LogType type)
+    {
+        if (type == LogType.Error || type == LogType.Exception)
+            errorLogs.Add($"{type}: {condition}\n{stackTrace}");
+    }
+
     [UnityTest, Performance]
+    [Timeout(1000000)]
     public IEnumerator SteadyStateTest()
     {
         var enemyPrefab = Resources.Load<GameObject>(enemyPrefabPath);
@@ -54,64 +67,113 @@ public class LoadTesting
         for (int i = 0; i < 100; i++)
         {
             Vector3 pos = new Vector3(Random.Range(-10, 10), 0, Random.Range(-10, 10));
-            var enemy = GameObject.Instantiate(enemyPrefab, pos, Quaternion.identity);
-            spawnedEnemies.Add(enemy);
+            NavMeshHit hit;
+            if (NavMesh.SamplePosition(pos, out hit, 2.0f, NavMesh.AllAreas))
+            {
+                spawnedEnemies.Add(Object.Instantiate(enemyPrefab, hit.position, Quaternion.identity));
+            }
         }
 
-        yield return new WaitForSeconds(2f);
-
-        for (int i = 0; i < 120; i++)
+        using (Measure.Frames().WarmupCount(10).MeasurementCount(20).Scope())
+        using (Measure.Scope("MemoryUsage"))
         {
-            yield return null;
-            Measure.Custom("SteadyState_FPS", 1.0f / Time.deltaTime);
-            Measure.Custom("SteadState_MemoryMB", Profiler.GetTotalAllocatedMemoryLong() / (1024.0f * 1024.0f));
+            float duration = 60f, elapsed = 0f;
+            while (elapsed < duration)
+            {
+                foreach (var enemy in spawnedEnemies)
+                {
+                    if (enemy)
+                    {
+                        var navAgent = enemy.GetComponent<NavMeshAgent>();
+                        if (navAgent)
+                        {
+                            navAgent.SetDestination(playerGameObject.transform.position);
+                        }
+                    }
+                }
+                Measure.Custom(new SampleGroup("MemoryUsage", SampleUnit.Megabyte), Profiler.GetTotalAllocatedMemoryLong() / (1024f * 1024f));
+                yield return new WaitForSeconds(0.1f);
+                elapsed += 0.1f;
+            }
         }
 
+        var fpsGroup = PerformanceTest.GetSampleGroup("FrameTime") ?? PerformanceTest.GetSampleGroup("Time"); ;
+        Assert.NotNull(fpsGroup, "FrameTime sample group not found");
+        Assert.LessOrEqual(fpsGroup.Median, 33.33f, $"Median frame time {fpsGroup.Median:F2} ms exceeds 33.33ms (30 FPS)");
+        Assert.IsEmpty(errorLogs, $"Errors detected: {string.Join("\n", errorLogs)}");
         yield return null;
     }
 
     [UnityTest, Performance]
+    [Timeout(1000000)]
     public IEnumerator RampUpTest()
     {
         var enemyPrefab = Resources.Load<GameObject>(enemyPrefabPath);
         Assert.IsNotNull(enemyPrefab, "Enemy prefab should be available");
-        int currentCount = 0;
 
-        for (int i = 0; i < 5; i++)
+        using (Measure.Frames().WarmupCount(10).MeasurementCount(20).Scope())
+        using (Measure.Scope("MemoryUsage"))
         {
-            for (int j = 0; j < 10; j++)
+            float duration = 60f;
+            float elapsed = 0f;
+            int maxEnemies = 50;
+            int enemiesPerStep = 10;
+            while (elapsed < duration)
             {
-                Vector3 pos = new Vector3(Random.Range(-10, 10), 0, Random.Range(-10, 10));
-                var enemy = GameObject.Instantiate(enemyPrefab, pos, Quaternion.identity);
-                spawnedEnemies.Add(enemy);
-                currentCount++;
-            }
-
-            yield return new WaitForSeconds(2f);
-
-            for (int f = 0; f < 30; f++)
-            {
-                yield return null;
-                Measure.Custom($"{currentCount}_Enemies_FPS", 1.0f / Time.deltaTime);
-                Measure.Custom($"{currentCount}_Enemies_MemoryMB", Profiler.GetTotalAllocatedMemoryLong() / (1024.0f * 1024.0f));
+                if (elapsed % 10f < 0.1f && spawnedEnemies.Count < maxEnemies)
+                {
+                    for (int i = 0; i < enemiesPerStep; i++)
+                    {
+                        Vector3 pos = new Vector3(Random.Range(-10, 10), 0, Random.Range(-10, 10));
+                        NavMeshHit hit;
+                        if (NavMesh.SamplePosition(pos, out hit, 2.0f, NavMesh.AllAreas))
+                        {
+                            spawnedEnemies.Add(Object.Instantiate(enemyPrefab, hit.position, Quaternion.identity));
+                        }
+                    }
+                }
+                foreach (var enemy in spawnedEnemies)
+                {
+                    if (enemy)
+                    {
+                        var navAgent = enemy.GetComponent<NavMeshAgent>();
+                        if (navAgent) 
+                        {
+                            navAgent.SetDestination(playerGameObject.transform.position);
+                        }
+                    }
+                }
+                Measure.Custom(new SampleGroup("MemoryUsage", SampleUnit.Megabyte), Profiler.GetTotalAllocatedMemoryLong() / (1024f * 1024f));
+                yield return new WaitForSeconds(0.1f);
+                elapsed += 0.1f;
             }
         }
+
+        var fpsGroup = PerformanceTest.GetSampleGroup("FrameTime") ?? PerformanceTest.GetSampleGroup("Time"); ;
+        Assert.NotNull(fpsGroup, "FrameTime sample group not found");
+        Assert.LessOrEqual(fpsGroup.Median, 33.33f, $"Median frame time {fpsGroup.Median:F2} ms exceeds 33.33ms (30 FPS)");
+        Assert.IsEmpty(errorLogs, $"Errors detected: {string.Join("\n", errorLogs)}");
+        yield return null;
     }
 
     [UnityTest, Performance]
+    [Timeout(1000000)]
     public IEnumerator ConcurrentEnemyChaseTest()
     {
         var enemyPrefab = Resources.Load<GameObject>(enemyPrefabPath);
-        Assert.IsNotNull(enemyPrefab, "Enemy prefab should be available");
+        Assert.IsNotNull(enemyPrefab, "Enemy prefab not found");
 
         for (int i = 0; i < 50; i++)
         {
             Vector3 pos = new Vector3(Random.Range(-10, 10), 0, Random.Range(-10, 10));
-            var enemy = GameObject.Instantiate(enemyPrefab, pos, Quaternion.identity);
-            spawnedEnemies.Add(enemy);
+            NavMeshHit hit;
+            if (NavMesh.SamplePosition(pos, out hit, 2.0f, NavMesh.AllAreas)) 
+            {
+                spawnedEnemies.Add(Object.Instantiate(enemyPrefab, hit.position, Quaternion.identity));
+            }
         }
 
-        yield return new WaitForSeconds(1f);
+        yield return null;
 
         foreach (var enemy in spawnedEnemies)
         {
@@ -122,39 +184,55 @@ public class LoadTesting
             }
         }
 
-        yield return null;
-
-        for (int i = 0; i < 10; i++)
+        using (Measure.Frames().WarmupCount(10).MeasurementCount(20).Scope())
+        using (Measure.Scope("MemoryUsage"))
         {
-            var stopwatch = Stopwatch.StartNew();
-
-            yield return null;
-
-            stopwatch.Stop();
-
-            double cpuTimeMs = stopwatch.Elapsed.TotalMilliseconds;
-            Measure.Custom("ConcurrentChase_FPS", 1.0f / Time.deltaTime);
-            Measure.Custom("ConcurrentChase_CPUTimeMS", cpuTimeMs);
-            Measure.Custom($"ConcurrentChase_MemoryMB", Profiler.GetTotalAllocatedMemoryLong() / (1024.0f * 1024.0f));
+            float duration = 60f;
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                foreach (var enemy in spawnedEnemies)
+                {
+                    if (enemy)
+                    {
+                        var navAgent = enemy.GetComponent<NavMeshAgent>();
+                        if (navAgent) 
+                        {
+                            navAgent.SetDestination(playerGameObject.transform.position);
+                        }
+                    }
+                }
+                Measure.Custom(new SampleGroup("MemoryUsage", SampleUnit.Megabyte), Profiler.GetTotalAllocatedMemoryLong() / (1024f * 1024f));
+                yield return new WaitForSeconds(0.1f);
+                elapsed += 0.1f;
+            }
         }
+
+        var fpsGroup = PerformanceTest.GetSampleGroup("FrameTime") ?? PerformanceTest.GetSampleGroup("Time");
+        Assert.NotNull(fpsGroup, "FrameTime sample group not found");
+        Assert.LessOrEqual(fpsGroup.Median, 33.33f, $"Median frame time {fpsGroup.Median:F2} ms exceeds 33.33ms (30 FPS)");
+        Assert.IsEmpty(errorLogs, $"Errors detected: {string.Join("\n", errorLogs)}");
+        yield return null;
     }
 
     [UnityTest, Performance]
+    [Timeout(1000000)]
     public IEnumerator MainGameSceneLoadTime()
     {
-        string sceneName = "Game";
+        const string sceneName = "Game";
 
-        float startTime = Time.realtimeSinceStartup;
-        var asyncOp = SceneManager.LoadSceneAsync(sceneName);
-        while (!asyncOp.isDone)
+        using (Measure.Scope("SceneLoadTime"))
         {
-            yield return null;
+            var asyncOp = SceneManager.LoadSceneAsync(sceneName);
+            while (!asyncOp.isDone)
+            {
+                yield return null;
+            }
         }
-        float loadTime = Time.realtimeSinceStartup - startTime;
-        Measure.Custom("SceneLoadTime_Sec", loadTime);
-        UnityEngine.Debug.Log($"Scene: {sceneName} loaded in {loadTime:F2} secpnds");
 
-        Assert.Less(loadTime, 3.0f, "Scene shouldn't be higher than 3 seconds");
+        var group = PerformanceTest.GetSampleGroup("SceneLoadTime");
+        Assert.NotNull(group, "SceneLoadTime sample group not found");
+        Assert.LessOrEqual(group.Median, 3.0f, $"Median scene load time {group.Median:F2} seconds exceeds 3 seconds");
 
         yield return null;
     }
