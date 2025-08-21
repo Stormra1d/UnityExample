@@ -79,23 +79,11 @@ jobs:
         id: mode
         shell: bash
         run: |
-          # Defaults: PR = tests only; push main = tests+build; manual = use inputs
+          # Defaults
           run_tests="true"
-          run_build="false"
-          create_release="false"
+          run_build="true"
+          create_release="true"
           target_platform="StandaloneWindows64"
-
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            run_build="false"
-          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
-            run_build="true"
-            create_release="true"
-          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            run_tests="${{ github.event.inputs.run_tests }}"
-            run_build="${{ github.event.inputs.run_build }}"
-            create_release="${{ github.event.inputs.create_release }}"
-            target_platform="${{ github.event.inputs.target_platform }}"
-          fi
 
           echo "run_tests=${run_tests}"        >> $GITHUB_OUTPUT
           echo "run_build=${run_build}"        >> $GITHUB_OUTPUT
@@ -125,6 +113,26 @@ jobs:
           done
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          
+      - name: Build
+        if: steps.mode.outputs.run_build == 'true'
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE:  ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL:    ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: ${{ env.PROJECT_PATH }}
+          targetPlatform: ${{ steps.mode.outputs.target_platform }}
+          buildName: ${{ env.BUILD_NAME }}
+          
+      - name: Upload Build Artifact
+        if: success() && steps.mode.outputs.run_build == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ steps.mode.outputs.target_platform }}
+          path: build/**/*
+          retention-days: 30
 
       - name: Run PlayMode Tests
         if: steps.mode.outputs.run_tests == 'true'
@@ -160,37 +168,6 @@ jobs:
           path: 'artifacts/*.xml'
           reporter: dotnet-nunit
           fail-on-error: false
-
-      - name: Free Disk Space before Build
-        if: steps.mode.outputs.run_build == 'true'
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          android: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: false
-          dotnet: false
-          tool-cache: false
-          
-      - name: Build
-        if: steps.mode.outputs.run_build == 'true'
-        uses: game-ci/unity-builder@v4
-        env:
-          UNITY_LICENSE:  ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL:    ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          projectPath: ${{ env.PROJECT_PATH }}
-          targetPlatform: ${{ steps.mode.outputs.target_platform }}
-          buildName: ${{ env.BUILD_NAME }}
-      - name: Upload Build Artifact
-        if: success() && steps.mode.outputs.run_build == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-${{ steps.mode.outputs.target_platform }}
-          path: build/**/*
-          retention-days: 30
       
       - name: Create GitHub Release
         if: success() && steps.mode.outputs.run_build == 'true' && steps.mode.outputs.create_release == 'true'
