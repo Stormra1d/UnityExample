@@ -9,7 +9,8 @@
         "Unity.AI.Navigation",
         "Unity.PerformanceTesting",
         "Unity.InputSystem",
-        "Unity.InputSystem.TestFramework"
+        "Unity.InputSystem.TestFramework",
+        "Unity.AutomatedQA"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
