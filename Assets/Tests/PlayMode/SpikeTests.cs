@@ -46,7 +46,7 @@ public class SpikeTests
         if (playerGameObject) Object.DestroyImmediate(playerGameObject);
         foreach (var gameObject in spawnedEnemies) if (gameObject) Object.DestroyImmediate(gameObject);
         foreach (var gameObject in spawnedProjectiles) if (gameObject) Object.DestroyImmediate(gameObject);
-        foreach (var gameObject in spawnedProjectiles) if (gameObject) Object.DestroyImmediate(gameObject);
+        foreach (var gameObject in spawnedCollectibles) if (gameObject) Object.DestroyImmediate(gameObject);
 
         spawnedEnemies.Clear();
         spawnedProjectiles.Clear();
