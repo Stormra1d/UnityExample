@@ -149,9 +149,6 @@ jobs:
             -debugCodeOptimization
             -burst-disable-compilation
             -enableCodeCoverage
-            -coverageResultsPath ./Coverage/Results
-            -coverageHistoryPath ./Coverage/History
-            -coverageOptions "generateHtmlReport;generateHtmlReportHistory;generateBadgeReport;generateAdditionalMetrics;verbosity:info;assemblyFilters:+<user>;-*Tests*;-*Editor*;pathFilters:-**/Tests/**"
             -testCategory "!SkipCI"
             -testResults artifacts/test-results.xml
             -perfTestResults artifacts/performance/perf-results.json
@@ -256,7 +253,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: CodeCoverage/Results/Report
+          path: ${{ env.PROJECT_PATH }}/CodeCoverage/Results/Report/
   
       - name: Deploy to GitHub Pages
         id: deploy
