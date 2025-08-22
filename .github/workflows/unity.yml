@@ -194,13 +194,13 @@ jobs:
           githubToken: ${{ secrets.GITHUB_TOKEN }}
           testMode: PlayMode
           artifactsPath: artifacts
+          coveragePath: artifacts/CodeCoverage/Report
           coverageOptions: >
             generateAdditionalMetrics;
             generateHtmlReport;
             generateHtmlReportHistory;
             generateBadgeReport;
-            assemblyFilters:+*;
-            path:artifacts/CodeCoverage
+            assemblyFilters:+*
           customParameters: >
             -debugCodeOptimization
             -burst-disable-compilation
