@@ -162,14 +162,12 @@ jobs:
       - name: Debug - Check Unity Editor logs after build
         if: steps.mode.outputs.run_build == 'true'
         run: |
-          echo "### Unity Editor Logs After Build" >> $GITHUB_STEP_SUMMARY
-          LOG_PATH="${{ env.PROJECT_PATH }}/Logs/Editor.log"
-          if [ -f "$LOG_PATH" ]; then
-            echo "Found Editor.log, checking for coverage errors" >> $GITHUB_STEP_SUMMARY
-            grep -i "coverage" "$LOG_PATH" >> $GITHUB_STEP_SUMMARY || echo "No coverage-related messages in Editor.log"
-          else
-            echo "Editor.log not found at $LOG_PATH" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "### Unity Logs After Build" >> $GITHUB_STEP_SUMMARY
+          find . -name "*.log" -type f >> $GITHUB_STEP_SUMMARY
+          for log in $(find . -name "*.log" -type f); do
+            echo "### Contents of $log (Coverage-Related)" >> $GITHUB_STEP_SUMMARY
+            grep -i "coverage" "$log" >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No coverage-related messages in $log"
+          done
 
       - name: Upload Build Artifact
         if: success() && steps.mode.outputs.run_build == 'true'
@@ -201,7 +199,7 @@ jobs:
             generateHtmlReport;
             generateHtmlReportHistory;
             generateBadgeReport;
-            assemblyFilters:+Assembly-CSharp,+GeneratedTests,+PlayMode,+Scripts,+StarterAssets;
+            assemblyFilters:+*;
             path:artifacts/CodeCoverage
           customParameters: >
             -debugCodeOptimization
@@ -212,32 +210,44 @@ jobs:
             -perfTestResults artifacts/performance/perf-results.json
             -enableProfiler
             -v
+            -logFile artifacts/playmode.log
+
+      - name: Copy Coverage Files to Artifacts
+        if: always() && steps.mode.outputs.run_tests == 'true'
+        run: |
+          echo "### Copying Coverage Files" >> $GITHUB_STEP_SUMMARY
+          if [ -d "${{ env.PROJECT_PATH }}/CodeCoverage/workspace-opencov/PlayMode" ]; then
+            echo "Found coverage files in CodeCoverage/workspace-opencov/PlayMode" >> $GITHUB_STEP_SUMMARY
+            mkdir -p artifacts/CodeCoverage/Report
+            cp -r ${{ env.PROJECT_PATH }}/CodeCoverage/workspace-opencov/PlayMode/* artifacts/CodeCoverage/Report/ || true
+            ls -R artifacts/CodeCoverage >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No coverage files found in CodeCoverage/workspace-opencov/PlayMode" >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Debug - List coverage-related files after tests
         if: always() && steps.mode.outputs.run_tests == 'true'
         run: |
           echo "### Coverage-Related Files" >> $GITHUB_STEP_SUMMARY
           echo "Artifacts Directory:" >> $GITHUB_STEP_SUMMARY
-          find artifacts -type f \( -name "*.xml" -o -name "*.html" -o -name "*coverage*" \) >> $GITHUB_STEP_SUMMARY 2>&1 || true
+          find artifacts -type f \( -name "*.xml" -o -name "*.html" -o -name "*coverage*" \) >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
           echo "CodeCoverage Directory in Project:" >> $GITHUB_STEP_SUMMARY
-          find ${{ env.PROJECT_PATH }}/CodeCoverage -type f >> $GITHUB_STEP_SUMMARY 2>&1 || echo "No CodeCoverage directory in project root"
-          echo "Unity Editor Logs for Coverage:" >> $GITHUB_STEP_SUMMARY
-          LOG_PATH="${{ env.PROJECT_PATH }}/Logs/Editor.log"
-          if [ -f "$LOG_PATH" ]; then
-            grep -i "coverage" "$LOG_PATH" >> $GITHUB_STEP_SUMMARY || echo "No coverage-related messages in Editor.log"
-          else
-            echo "Editor.log not found at $LOG_PATH" >> $GITHUB_STEP_SUMMARY
-          fi
+          find ${{ env.PROJECT_PATH }}/CodeCoverage -type f >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No CodeCoverage directory in project root"
+          echo "Unity Logs for Coverage:" >> $GITHUB_STEP_SUMMARY
+          for log in $(find . -name "*.log" -type f); do
+            echo "### Contents of $log (Coverage-Related)" >> $GITHUB_STEP_SUMMARY
+            grep -i "coverage" "$log" >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No coverage-related messages in $log"
+          done
 
       - name: Debug - Print sample coverage file contents
         if: always() && steps.mode.outputs.run_tests == 'true'
         run: |
-          COVERAGE_XML=$(find artifacts -name "*.opencover.xml" -print -quit 2>/dev/null)
+          COVERAGE_XML=$(find artifacts -name "*.xml" -print -quit 2>/dev/null)
           if [ -n "$COVERAGE_XML" ]; then
             echo "### Sample Coverage XML (First 50 Lines)" >> $GITHUB_STEP_SUMMARY
             head -n 50 "$COVERAGE_XML" >> $GITHUB_STEP_SUMMARY
           else
-            echo "No *.opencover.xml found in artifacts" >> $GITHUB_STEP_SUMMARY
+            echo "No *.xml found in artifacts" >> $GITHUB_STEP_SUMMARY
           fi
           REPORT_INDEX=$(find artifacts -name "index.html" -print -quit 2>/dev/null)
           if [ -n "$REPORT_INDEX" ]; then
@@ -251,7 +261,7 @@ jobs:
         if: always() && steps.mode.outputs.run_tests == 'true'
         uses: ActuatorDigital/UnityCodeCoverage.Action@v0.0.4
         with:
-          coverage-file-path: artifacts/CodeCoverage/Report/Summary.xml
+          coverage-file-path: artifacts/CodeCoverage/Report/TestCoverageResults_0000.xml
           required-coverage: 25
 
       - name: Parse Performance Results
@@ -317,17 +327,17 @@ jobs:
         run: |
           echo "### Paths Included in Upload Artifact" >> $GITHUB_STEP_SUMMARY
           echo "artifacts/**/*.xml:" >> $GITHUB_STEP_SUMMARY
-          find artifacts -name "*.xml" >> $GITHUB_STEP_SUMMARY 2>&1 || true
+          find artifacts -name "*.xml" >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
           echo "artifacts/**/*.log:" >> $GITHUB_STEP_SUMMARY
-          find artifacts -name "*.log" >> $GITHUB_STEP_SUMMARY 2>&1 || true
+          find artifacts -name "*.log" >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
           echo "**/Logs/**:" >> $GITHUB_STEP_SUMMARY
-          find . -path "*/Logs/*" -maxdepth 3 >> $GITHUB_STEP_SUMMARY 2>&1 || true
+          find . -path "*/Logs/*" -maxdepth 3 >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
           echo "**/CodeCoverage/**:" >> $GITHUB_STEP_SUMMARY
-          find . -path "*/CodeCoverage/*" -maxdepth 3 >> $GITHUB_STEP_SUMMARY 2>&1 || true
+          find . -path "*/CodeCoverage/*" -maxdepth 3 >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
           echo "artifacts/CodeCoverage/**:" >> $GITHUB_STEP_SUMMARY
-          find artifacts/CodeCoverage >> $GITHUB_STEP_SUMMARY 2>&1 || true
+          find artifacts/CodeCoverage >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
           echo "Coverage/**:" >> $GITHUB_STEP_SUMMARY
-          find . -path "*/Coverage/*" -maxdepth 3 >> $GITHUB_STEP_SUMMARY 2>&1 || true
+          find . -path "*/Coverage/*" -maxdepth 3 >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
 
       - name: Publish Test Results
         if: always() && steps.mode.outputs.run_tests == 'true'
@@ -365,13 +375,13 @@ jobs:
       - name: Debug - List coverage artifact contents
         run: |
           echo "### Coverage Artifact Contents" >> $GITHUB_STEP_SUMMARY
-          find coverage-artifact -type f -name "*.xml" -o -name "*.html" -o -name "*coverage*" >> $GITHUB_STEP_SUMMARY 2>&1 || true
+          find coverage-artifact -type f -name "*.xml" -o -name "*.html" -o -name "*coverage*" >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
           echo "### Coverage Directories" >> $GITHUB_STEP_SUMMARY
-          find coverage-artifact -type d -name "*Coverage*" >> $GITHUB_STEP_SUMMARY 2>&1 || true
+          find coverage-artifact -type d -name "*Coverage*" >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
 
       - name: Debug - Print sample file contents
         run: |
-          COVERAGE_XML=$(find coverage-artifact -name "*.opencover.xml" -print -quit 2>/dev/null)
+          COVERAGE_XML=$(find coverage-artifact -name "*.xml" -print -quit 2>/dev/null)
           if [ -n "$COVERAGE_XML" ]; then
             echo "### Sample Coverage XML (First 50 Lines)" >> $GITHUB_STEP_SUMMARY
             head -n 50 "$COVERAGE_XML" >> $GITHUB_STEP_SUMMARY
@@ -387,10 +397,7 @@ jobs:
         run: |
           COVERAGE_PATHS=(
             "coverage-artifact/artifacts/CodeCoverage/Report"
-            "coverage-artifact/artifacts/CodeCoverage/Results/Report"
-            "coverage-artifact/CodeCoverage/Results/Report"
-            "coverage-artifact/CodeCoverage/Report"
-            "coverage-artifact/Coverage/Report"
+            "coverage-artifact/CodeCoverage/workspace-opencov/PlayMode"
             "coverage-artifact/artifacts/CodeCoverage"
             "coverage-artifact/CodeCoverage"
             "coverage-artifact/Coverage"
@@ -399,7 +406,7 @@ jobs:
           )
           REPORT_PATH=""
           for path in "${COVERAGE_PATHS[@]}"; do
-            if [ -d "$path" ] && [ -n "$(find "$path" -name "*.html" -type f)" ]; then
+            if [ -d "$path" ] && [ -n "$(find "$path" -name "*.html" -o -name "*.xml" -type f)" ]; then
               echo "Found coverage report at: $path" >> $GITHUB_STEP_SUMMARY
               REPORT_PATH="$path"
               break
@@ -407,11 +414,11 @@ jobs:
           done
           if [ -z "$REPORT_PATH" ]; then
             echo "Could not find coverage report in expected locations" >> $GITHUB_STEP_SUMMARY
-            REPORT_PATH=$(find coverage-artifact -type f -name "*.html" -exec dirname {} \; | head -1 | uniq)
+            REPORT_PATH=$(find coverage-artifact -type f -name "*.xml" -exec dirname {} \; | head -1 | uniq)
             if [ -n "$REPORT_PATH" ]; then
-              echo "Fallback: Found HTML files in: $REPORT_PATH" >> $GITHUB_STEP_SUMMARY
+              echo "Fallback: Found XML files in: $REPORT_PATH" >> $GITHUB_STEP_SUMMARY
             else
-              echo "No HTML files found anywhere in artifact" >> $GITHUB_STEP_SUMMARY
+              echo "No coverage files found anywhere in artifact" >> $GITHUB_STEP_SUMMARY
               exit 0
             fi
           fi
