@@ -90,12 +90,6 @@ jobs:
           echo "create_release=${create_release}" >> $GITHUB_OUTPUT
           echo "target_platform=${target_platform}" >> $GITHUB_OUTPUT
 
-      - name: Debug license is present (length only)
-        run: |
-          echo "UNITY_LICENSE length: ${#UNITY_LICENSE}"
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-
       - name: Hard-unset Unity activation envs
         run: |
           echo "UNITY_SERIAL="   >> "$GITHUB_ENV"
@@ -163,54 +157,63 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -y && sudo apt-get install -y jq
-          
+      
           JSON_PATH="artifacts/performance/perf-results.json"
-          if [ -f "$JSON_PATH" ]; then
-            echo "## Performance Test Summary" >> "$GITHUB_STEP_SUMMARY"
-          
-            unitName='
+          if [ ! -f "$JSON_PATH" ]; then
+            echo "No performance test results found (missing $JSON_PATH)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+      
+          {
+            echo "## Performance Test Summary"
+            echo
+            echo "| Test | Metric | Median | Unit | FPS |"
+            echo "|---|---|---:|---|---:|"
+      
+            jq -r '
               def unit_name($u):
                 (["Nanosecond","Microsecond","Millisecond","Second",
                   "Byte","Kilobyte","Megabyte","Gigabyte","Undefined"][$u] // "Unknown");
-            '
-          
-            # choose the proper root: array | .Tests[] | .Results[]
-            if jq -e 'type=="array"' "$JSON_PATH" >/dev/null 2>&1; then root='.'; 
-            elif jq -e '.Tests? | type=="array"' "$JSON_PATH" >/dev/null 2>&1; then root='.Tests';
-            else root='.Results'; fi
-          
-            jq -r "$unitName
-              [\"Test\",\"Metric\",\"Median\",\"Unit\"],
-              ( $root[]
-                | select(.SampleGroups != null)
-                | . as \$t
-                | .SampleGroups[]
-                | [(\$t.TestName // \$t.Name // (\"\" + (\$t.ClassName // \"\") + \".\" + (\$t.MethodName // \"\") ) // \"unknown\"),
-                   (.Name // \"unknown\"),
-                   (.Median // .Min // .Max // \"n/a\"),
-                   (if (.Unit|type)==\"number\" then unit_name(.Unit) else (.SampleUnit // \"n/a\") end)
-                  ]
-              )
-              | @tsv" "$JSON_PATH" \
-            | awk 'BEGIN{FS="\t"; OFS=" | "} NR==1{print "|"$1" | "$2" | "$3" | "$4"|\n|---|---:|---:|---|"} NR>1{printf("|%s|\n",$0)}' \
-            >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "No performance test results found (missing $JSON_PATH)" >> "$GITHUB_STEP_SUMMARY"
-          fi
+      
+              # choose root: .Results (3.1+), else .Tests, else array
+              (if (.Results? | type=="array") then .Results
+               elif (.Tests? | type=="array") then .Tests
+               elif (type=="array") then .
+               else [] end)
+              | .[]
+              | .Name as $test
+              | (.SampleGroups // [])[]
+              | . as $g
+              | [
+                  $test,
+                  ($g.Name // "unknown"),
+                  ($g.Median // $g.Average // $g.Min // "n/a"),
+                  (if ($g.Unit|type)=="number" then unit_name($g.Unit) else ($g.Unit // "n/a") end),
+                  (if (($g.Name=="Time") and (($g.Median // 0) > 0))
+                     then (1000/($g.Median)) else empty end)
+                ]
+              | @tsv
+            ' "$JSON_PATH" \
+            | awk -F'\t' '{
+                test=$1; metric=$2; med=$3; unit=$4; fps=$5;
+                if (fps=="") printf("|%s|%s|%s|%s| |\n", test, metric, med, unit);
+                else          printf("|%s|%s|%.2f|%s|%.1f|\n", test, metric, med, unit, fps);
+              }'
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload Test Results (XML, logs, coverage)
-        if: always() && steps.mode.outputs.run_tests == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: unity-test-results
-          path: |
-            artifacts/**/*.xml
-            artifacts/**/*.log
-            artifacts/performance/**/*.html
-            artifacts/performance/**/*.json
-            **/Logs/**
-            Coverage/**
-          retention-days: 14
+    - name: Upload Test Results (XML, logs, coverage)
+      if: always() && steps.mode.outputs.run_tests == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: unity-test-results
+        path: |
+          artifacts/**/*.xml
+          artifacts/**/*.log
+          artifacts/performance/**/*.html
+          artifacts/performance/**/*.json
+          **/Logs/**
+          Coverage/**
+        retention-days: 14
       
       - name: Publish Test Results
         if: always() && steps.mode.outputs.run_tests == 'true'
