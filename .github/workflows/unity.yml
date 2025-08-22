@@ -33,6 +33,8 @@ permissions:
   contents: write
   pull-requests: write
   checks: write
+  pages: write
+  id-token: write
 
 env:
   PROJECT_PATH: .
@@ -144,9 +146,12 @@ jobs:
           testMode: PlayMode
           artifactsPath: artifacts
           customParameters: >
+            -debugCodeOptimization
+            -burst-disable-compilation
             -enableCodeCoverage
-            -coverageResultsPath ./Coverage
-            -coverageOptions enableCyclomaticComplexity;generateHtmlReport
+            -coverageResultsPath ./Coverage/Results
+            -coverageHistoryPath ./Coverage/History
+            -coverageOptions "generateHtmlReport;generateHtmlReportHistory;generateBadgeReport;generateAdditionalMetrics;verbosity:info;assemblyFilters:+<user>;-*Tests*;-*Editor*;pathFilters:-**/Tests/**"
             -testCategory "!SkipCI"
             -testResults artifacts/test-results.xml
             -perfTestResults artifacts/performance/perf-results.json
@@ -235,3 +240,30 @@ jobs:
             **Platform:** ${{ steps.mode.outputs.target_platform }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy_coverage:
+    name: Publish Coverage to GitHub Pages
+    needs: unity_ci
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download coverage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: unity-test-results
+          path: .
+  
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: Coverage/Results
+  
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
+
+      - name: Add link to summary
+        if: always()
+        run: |
+          echo "### Code Coverage" >> "$GITHUB_STEP_SUMMARY"
+          echo "Latest report: ${{ steps.deploy.outputs.page_url }}" >> "$GITHUB_STEP_SUMMARY"
