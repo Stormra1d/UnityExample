@@ -158,56 +158,42 @@ jobs:
             -perfTestResults artifacts/performance/perf-results.json
             -enableProfiler
 
-      - name: List artifacts
-        if: always()
-        run: |
-          echo "== artifacts =="
-          find artifacts -maxdepth 3 -type f -printf "%p\n" || true
-
       - name: Parse Performance Results
         if: always() && steps.mode.outputs.run_tests == 'true'
         run: |
           set -euo pipefail
           sudo apt-get update -y && sudo apt-get install -y jq
-      
+          
           JSON_PATH="artifacts/performance/perf-results.json"
           if [ -f "$JSON_PATH" ]; then
             echo "## Performance Test Summary" >> "$GITHUB_STEP_SUMMARY"
-      
-            if jq -e 'type=="array"' "$JSON_PATH" >/dev/null 2>&1; then
-              jq -r '
-                ["Test","Metric","Median","Unit"],
-                ( .[] 
-                  | select(.SampleGroups != null)
-                  | . as $t
-                  | .SampleGroups[]
-                  | [($t.TestName // .TestName // "unknown"),
-                     (.Name // "unknown"),
-                     (.Median // .Min // .Max // "n/a"),
-                     (.SampleUnit // .Unit // "n/a")]
-                ) 
-                | @tsv' "$JSON_PATH" \
-              | awk 'BEGIN{FS="\t"; OFS=" | "} NR==1{print "|"$1" | "$2" | "$3" | "$4"|\n|---|---:|---:|---|"} NR>1{printf("|%s|\n",$0)}' \
-              >> "$GITHUB_STEP_SUMMARY"
-      
-            elif jq -e '.Tests? | type=="array"' "$JSON_PATH" >/dev/null 2>&1; then
-              jq -r '
-                ["Test","Metric","Median","Unit"],
-                ( .Tests[]
-                  | select(.SampleGroups != null)
-                  | . as $t
-                  | .SampleGroups[]
-                  | [($t.TestName // .TestName // "unknown"),
-                     (.Name // "unknown"),
-                     (.Median // .Min // .Max // "n/a"),
-                     (.SampleUnit // .Unit // "n/a")]
-                )
-                | @tsv' "$JSON_PATH" \
-              | awk 'BEGIN{FS="\t"; OFS=" | "} NR==1{print "|"$1" | "$2" | "$3" | "$4"|\n|---|---:|---:|---|"} NR>1{printf("|%s|\n",$0)}' \
-              >> "$GITHUB_STEP_SUMMARY"
-            else
-              echo "Perf JSON found but schema not recognized." >> "$GITHUB_STEP_SUMMARY"
-            fi
+          
+            unitName='
+              def unit_name($u):
+                (["Nanosecond","Microsecond","Millisecond","Second",
+                  "Byte","Kilobyte","Megabyte","Gigabyte","Undefined"][$u] // "Unknown");
+            '
+          
+            # choose the proper root: array | .Tests[] | .Results[]
+            if jq -e 'type=="array"' "$JSON_PATH" >/dev/null 2>&1; then root='.'; 
+            elif jq -e '.Tests? | type=="array"' "$JSON_PATH" >/dev/null 2>&1; then root='.Tests';
+            else root='.Results'; fi
+          
+            jq -r "$unitName
+              [\"Test\",\"Metric\",\"Median\",\"Unit\"],
+              ( $root[]
+                | select(.SampleGroups != null)
+                | . as \$t
+                | .SampleGroups[]
+                | [(\$t.TestName // \$t.Name // (\"\" + (\$t.ClassName // \"\") + \".\" + (\$t.MethodName // \"\") ) // \"unknown\"),
+                   (.Name // \"unknown\"),
+                   (.Median // .Min // .Max // \"n/a\"),
+                   (if (.Unit|type)==\"number\" then unit_name(.Unit) else (.SampleUnit // \"n/a\") end)
+                  ]
+              )
+              | @tsv" "$JSON_PATH" \
+            | awk 'BEGIN{FS="\t"; OFS=" | "} NR==1{print "|"$1" | "$2" | "$3" | "$4"|\n|---|---:|---:|---|"} NR>1{printf("|%s|\n",$0)}' \
+            >> "$GITHUB_STEP_SUMMARY"
           else
             echo "No performance test results found (missing $JSON_PATH)" >> "$GITHUB_STEP_SUMMARY"
           fi
