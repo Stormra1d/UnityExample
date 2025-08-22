@@ -211,6 +211,14 @@ jobs:
             -v
             -logFile artifacts/playmode.log
 
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'   # or 7.0.x if you prefer
+
+      - name: Make dotnet global tools available
+        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+
       - name: Generate HTML Coverage Report from XML
         if: always() && steps.mode.outputs.run_tests == 'true'
         run: |
