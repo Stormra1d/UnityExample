@@ -249,6 +249,72 @@ jobs:
         with:
           name: unity-test-results
           path: .
+
+      - name: Debug - List all files in coverage artifact
+        run: |
+          echo "=== Listing all files in coverage artifact ==="
+          find coverage-artifact -type f -name "*.html" -o -name "*.xml" -o -name "*.json" | head -20
+          echo "=== Directory structure ==="
+          find coverage-artifact -type d | head -20
+  
+      - name: Debug - Find all HTML reports recursively
+        run: |
+          echo "=== Searching for HTML coverage reports ==="
+          find coverage-artifact -name "*.html" -type f | while read file; do
+            echo "Found HTML file: $file"
+            if grep -q "Code Coverage" "$file" 2>/dev/null; then
+              echo "  ^ This appears to be a coverage report!"
+            fi
+          done
+  
+      - name: Debug - Check for coverage directories
+        run: |
+          echo "=== Checking for common coverage directories ==="
+          if [ -d "coverage-artifact/CodeCoverage" ]; then
+            echo "Found CodeCoverage directory:"
+            ls -la coverage-artifact/CodeCoverage/
+          fi
+          if [ -d "coverage-artifact/Coverage" ]; then
+            echo "Found Coverage directory:"
+            ls -la coverage-artifact/Coverage/
+          fi
+          if [ -d "coverage-artifact/artifacts" ]; then
+            echo "Found artifacts directory:"
+            ls -la coverage-artifact/artifacts/
+          fi
+  
+      - name: Try to locate coverage report path
+        id: find_coverage
+        run: |
+          COVERAGE_PATHS=(
+            "coverage-artifact/CodeCoverage/Results/Report"
+            "coverage-artifact/Coverage/Report"
+            "coverage-artifact/artifacts/CodeCoverage"
+            "coverage-artifact"
+          )
+          
+          REPORT_PATH=""
+          for path in "${COVERAGE_PATHS[@]}"; do
+            if [ -d "$path" ] && [ -n "$(find "$path" -name "*.html" -type f)" ]; then
+              echo "Found coverage report at: $path"
+              REPORT_PATH="$path"
+              break
+            fi
+          done
+          
+          if [ -z "$REPORT_PATH" ]; then
+            echo "Could not find coverage report in any expected location"
+            REPORT_PATH=$(find coverage-artifact -type f -name "*.html" -exec dirname {} \; | head -1 | uniq)
+            if [ -n "$REPORT_PATH" ]; then
+              echo "Found HTML files in: $REPORT_PATH"
+            else
+              echo "No HTML files found anywhere in artifact"
+              exit 1
+            fi
+          fi
+          
+          echo "REPORT_PATH=$REPORT_PATH" >> $GITHUB_ENV
+          echo "report_path=$REPORT_PATH" >> $GITHUB_OUTPUT
   
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
