@@ -201,20 +201,20 @@ jobs:
               }'
           } >> "$GITHUB_STEP_SUMMARY"
 
-    - name: Upload Test Results (XML, logs, coverage)
-      if: always() && steps.mode.outputs.run_tests == 'true'
-      uses: actions/upload-artifact@v4
-      with:
-        name: unity-test-results
-        path: |
-          artifacts/**/*.xml
-          artifacts/**/*.log
-          artifacts/performance/**/*.html
-          artifacts/performance/**/*.json
-          **/Logs/**
-          Coverage/**
-        retention-days: 14
-      
+      - name: Upload Test Results (XML, logs, coverage)
+        if: always() && steps.mode.outputs.run_tests == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-test-results
+          path: |
+            artifacts/**/*.xml
+            artifacts/**/*.log
+            artifacts/performance/**/*.html
+            artifacts/performance/**/*.json
+            **/Logs/**
+            Coverage/**
+          retention-days: 14
+        
       - name: Publish Test Results
         if: always() && steps.mode.outputs.run_tests == 'true'
         uses: dorny/test-reporter@main
