@@ -248,8 +248,8 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: unity-test-results
-          path: .
-
+          path: coverage-artifact
+  
       - name: Debug - List all files in coverage artifact
         run: |
           echo "=== Listing all files in coverage artifact ==="
@@ -319,14 +319,19 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ${{ env.PROJECT_PATH }}/CodeCoverage/Results/Report/
+          path: ${{ env.REPORT_PATH }}
   
       - name: Deploy to GitHub Pages
         id: deploy
         uses: actions/deploy-pages@v4
-
+  
       - name: Add link to summary
         if: always()
         run: |
           echo "### Code Coverage" >> "$GITHUB_STEP_SUMMARY"
-          echo "Latest report: ${{ steps.deploy.outputs.page_url }}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ steps.deploy.outcome }}" == "success" ]; then
+            echo "Latest report: ${{ steps.deploy.outputs.page_url }}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Failed to deploy coverage report. Check the debug steps above." >> "$GITHUB_STEP_SUMMARY"
+            echo "Report path attempted: ${{ env.REPORT_PATH }}" >> "$GITHUB_STEP_SUMMARY"
+          fi
