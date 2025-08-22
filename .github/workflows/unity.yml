@@ -182,35 +182,34 @@ jobs:
           mkdir -p artifacts/performance artifacts/CodeCoverage
 
       - name: Run PlayMode Tests
-        id: tests
-        if: steps.mode.outputs.run_tests == 'true'
-        uses: game-ci/unity-test-runner@v4
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          projectPath: ${{ env.PROJECT_PATH }}
-          githubToken: ${{ secrets.GITHUB_TOKEN }}
-          testMode: PlayMode
-          artifactsPath: artifacts
-          coveragePath: artifacts/CodeCoverage/Report
-          coverageOptions: >
-            generateAdditionalMetrics;
+        id: tests
+        if: steps.mode.outputs.run_tests == 'true'
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: ${{ env.PROJECT_PATH }}
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          testMode: PlayMode
+          artifactsPath: artifacts
+          coverageOptions: >
+            generateAdditionalMetrics;
             generateHtmlReport;
-            generateHtmlReportHistory;
-            generateBadgeReport;
-            assemblyFilters:+*
-          customParameters: >
-            -debugCodeOptimization
-            -burst-disable-compilation
-            -enableCodeCoverage
-            -testCategory "!SkipCI"
-            -testResults artifacts/test-results.xml
-            -perfTestResults artifacts/performance/perf-results.json
-            -enableProfiler
-            -v
-            -logFile artifacts/playmode.log
+            generateHtmlReportHistory;
+            generateBadgeReport;
+            assemblyFilters:+*
+          customParameters: >
+            -debugCodeOptimization
+            -burst-disable-compilation
+            -enableCodeCoverage
+            -testCategory "!SkipCI"
+            -testResults artifacts/test-results.xml
+            -perfTestResults artifacts/performance/perf-results.json
+            -enableProfiler
+            -v
+            -logFile artifacts/playmode.log
 
       - name: Copy Coverage Files to Artifacts
         if: always() && steps.mode.outputs.run_tests == 'true'
