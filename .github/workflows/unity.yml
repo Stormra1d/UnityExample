@@ -55,12 +55,6 @@ jobs:
           lfs: true
           fetch-depth: 1
 
-      - name: Debug - Check disk usage before cleanup
-        run: |
-          echo "### Disk Usage Before Cleanup" >> $GITHUB_STEP_SUMMARY
-          df -h >> $GITHUB_STEP_SUMMARY
-          docker system df || true >> $GITHUB_STEP_SUMMARY
-
       - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@v1.3.1
         with:
@@ -71,12 +65,6 @@ jobs:
           swap-storage: false
           dotnet: false
           tool-cache: false
-
-      - name: Debug - Check disk usage after cleanup
-        run: |
-          echo "### Disk Usage After Cleanup" >> $GITHUB_STEP_SUMMARY
-          df -h >> $GITHUB_STEP_SUMMARY
-          docker system df || true >> $GITHUB_STEP_SUMMARY
 
       - name: Cache Library
         uses: actions/cache@v4
@@ -103,50 +91,6 @@ jobs:
         run: |
           echo "UNITY_SERIAL=" >> "$GITHUB_ENV"
 
-      - name: Detect UNITY_* envs
-        run: |
-          set -euo pipefail
-          for v in UNITY_LICENSE UNITY_SERIAL UNITY_EMAIL UNITY_PASSWORD; do
-            if [[ -v $v ]]; then
-              eval "val=\${$v}"
-              echo "$v is SET (len=${#val})"
-            else
-              echo "$v is NOT set"
-            fi
-          done
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-
-      - name: Debug - Verify Code Coverage Package
-        run: |
-          echo "### Checking Packages/manifest.json" >> $GITHUB_STEP_SUMMARY
-          if grep -q "com.unity.testtools.codecoverage" ${{ env.PROJECT_PATH }}/Packages/manifest.json; then
-            echo "Code Coverage package found in manifest.json" >> $GITHUB_STEP_SUMMARY
-            cat ${{ env.PROJECT_PATH }}/Packages/manifest.json >> $GITHUB_STEP_SUMMARY
-          else
-            echo "ERROR: Code Coverage package NOT found in manifest.json" >> $GITHUB_STEP_SUMMARY
-            exit 1
-          fi
-
-      - name: Debug - Print Code Coverage Settings File
-        run: |
-          SETTINGS_PATH="${{ env.PROJECT_PATH }}/ProjectSettings/Packages/com.unity.testtools.codecoverage/Settings.json"
-          echo "### Code Coverage Settings.json Path: $SETTINGS_PATH" >> $GITHUB_STEP_SUMMARY
-          if [ -f "$SETTINGS_PATH" ]; then
-            echo "### Code Coverage Settings.json Content" >> $GITHUB_STEP_SUMMARY
-            cat "$SETTINGS_PATH" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "ERROR: Settings.json not found at $SETTINGS_PATH" >> $GITHUB_STEP_SUMMARY
-            exit 1
-          fi
-
-      - name: Debug - List project directory before runs
-        run: |
-          echo "### Project Directory (Limited to Key Paths)" >> $GITHUB_STEP_SUMMARY
-          find ${{ env.PROJECT_PATH }} -maxdepth 3 -type d >> $GITHUB_STEP_SUMMARY
-          echo "### Finding Settings.json" >> $GITHUB_STEP_SUMMARY
-          find ${{ env.PROJECT_PATH }} -name "Settings.json" >> $GITHUB_STEP_SUMMARY
-
       - name: Build
         if: steps.mode.outputs.run_build == 'true'
         uses: game-ci/unity-builder@v4
@@ -159,16 +103,6 @@ jobs:
           targetPlatform: ${{ steps.mode.outputs.target_platform }}
           buildName: ${{ env.BUILD_NAME }}
 
-      - name: Debug - Check Unity Editor logs after build
-        if: steps.mode.outputs.run_build == 'true'
-        run: |
-          echo "### Unity Logs After Build" >> $GITHUB_STEP_SUMMARY
-          find . -name "*.log" -type f >> $GITHUB_STEP_SUMMARY
-          for log in $(find . -name "*.log" -type f); do
-            echo "### Contents of $log (Coverage-Related)" >> $GITHUB_STEP_SUMMARY
-            grep -i "coverage" "$log" >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No coverage-related messages in $log"
-          done
-
       - name: Upload Build Artifact
         if: success() && steps.mode.outputs.run_build == 'true'
         uses: actions/upload-artifact@v4
@@ -178,8 +112,7 @@ jobs:
           retention-days: 30
 
       - name: Ensure artifacts dirs
-        run: |
-          mkdir -p artifacts/performance artifacts/CodeCoverage
+        run: mkdir -p artifacts/performance artifacts/CodeCoverage
 
       - name: Run PlayMode Tests
         id: tests
@@ -214,7 +147,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'   # or 7.0.x if you prefer
+          dotnet-version: '8.0.x'
 
       - name: Make dotnet global tools available
         run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
@@ -222,63 +155,18 @@ jobs:
       - name: Generate HTML Coverage Report from XML
         if: always() && steps.mode.outputs.run_tests == 'true'
         run: |
-          echo "### Generating HTML Coverage Report" >> $GITHUB_STEP_SUMMARY
           dotnet tool install -g dotnet-reportgenerator-globaltool
           reportgenerator \
             -reports:"${{ env.PROJECT_PATH }}/CodeCoverage/workspace-opencov/PlayMode/*.xml" \
             -targetdir:"artifacts/CodeCoverage/ReportHtml" \
             -reporttypes:HtmlInline_AzurePipelines
-          if [ -d "artifacts/CodeCoverage/ReportHtml" ]; then
-            echo "HTML report successfully generated." >> $GITHUB_STEP_SUMMARY
-            ls artifacts/CodeCoverage/ReportHtml >> $GITHUB_STEP_SUMMARY
-          else
-            echo "ERROR: HTML report directory was not created." >> $GITHUB_STEP_SUMMARY
-            exit 1
-          fi
 
       - name: Copy Coverage Files to Artifacts
         if: always() && steps.mode.outputs.run_tests == 'true'
         run: |
-          echo "### Copying Coverage Files" >> $GITHUB_STEP_SUMMARY
           if [ -d "${{ env.PROJECT_PATH }}/CodeCoverage/workspace-opencov/PlayMode" ]; then
-            echo "Found coverage files in CodeCoverage/workspace-opencov/PlayMode" >> $GITHUB_STEP_SUMMARY
             mkdir -p artifacts/CodeCoverage/Report
             cp -r ${{ env.PROJECT_PATH }}/CodeCoverage/workspace-opencov/PlayMode/* artifacts/CodeCoverage/Report/ || true
-            ls -R artifacts/CodeCoverage >> $GITHUB_STEP_SUMMARY
-          else
-            echo "No coverage files found in CodeCoverage/workspace-opencov/PlayMode" >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: Debug - List coverage-related files after tests
-        if: always() && steps.mode.outputs.run_tests == 'true'
-        run: |
-          echo "### Coverage-Related Files" >> $GITHUB_STEP_SUMMARY
-          echo "Artifacts Directory:" >> $GITHUB_STEP_SUMMARY
-          find artifacts -type f \( -name "*.xml" -o -name "*.html" -o -name "*coverage*" \) >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
-          echo "CodeCoverage Directory in Project:" >> $GITHUB_STEP_SUMMARY
-          find ${{ env.PROJECT_PATH }}/CodeCoverage -type f >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No CodeCoverage directory in project root"
-          echo "Unity Logs for Coverage:" >> $GITHUB_STEP_SUMMARY
-          for log in $(find . -name "*.log" -type f); do
-            echo "### Contents of $log (Coverage-Related)" >> $GITHUB_STEP_SUMMARY
-            grep -i "coverage" "$log" >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No coverage-related messages in $log"
-          done
-
-      - name: Debug - Print sample coverage file contents
-        if: always() && steps.mode.outputs.run_tests == 'true'
-        run: |
-          COVERAGE_XML=$(find artifacts -name "*.xml" -print -quit 2>/dev/null)
-          if [ -n "$COVERAGE_XML" ]; then
-            echo "### Sample Coverage XML (First 50 Lines)" >> $GITHUB_STEP_SUMMARY
-            head -n 50 "$COVERAGE_XML" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "No *.xml found in artifacts" >> $GITHUB_STEP_SUMMARY
-          fi
-          REPORT_INDEX=$(find artifacts -name "index.html" -print -quit 2>/dev/null)
-          if [ -n "$REPORT_INDEX" ]; then
-            echo "### Coverage Report index.html Found at $REPORT_INDEX" >> $GITHUB_STEP_SUMMARY
-            head -n 50 "$REPORT_INDEX" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "No index.html found in coverage reports" >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Check Code Coverage
@@ -294,7 +182,6 @@ jobs:
           sudo apt-get update -y && sudo apt-get install -y jq
           JSON_PATH="artifacts/performance/perf-results.json"
           if [ ! -f "$JSON_PATH" ]; then
-            echo "No performance test results found (missing $JSON_PATH)" >> $GITHUB_STEP_SUMMARY
             exit 0
           fi
           {
@@ -347,23 +234,6 @@ jobs:
             Coverage/**
           retention-days: 14
 
-      - name: Debug - Confirm uploaded artifact paths
-        if: always() && steps.mode.outputs.run_tests == 'true'
-        run: |
-          echo "### Paths Included in Upload Artifact" >> $GITHUB_STEP_SUMMARY
-          echo "artifacts/**/*.xml:" >> $GITHUB_STEP_SUMMARY
-          find artifacts -name "*.xml" >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
-          echo "artifacts/**/*.log:" >> $GITHUB_STEP_SUMMARY
-          find artifacts -name "*.log" >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
-          echo "**/Logs/**:" >> $GITHUB_STEP_SUMMARY
-          find . -path "*/Logs/*" -maxdepth 3 >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
-          echo "**/CodeCoverage/**:" >> $GITHUB_STEP_SUMMARY
-          find . -path "*/CodeCoverage/*" -maxdepth 3 >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
-          echo "artifacts/CodeCoverage/**:" >> $GITHUB_STEP_SUMMARY
-          find artifacts/CodeCoverage >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
-          echo "Coverage/**:" >> $GITHUB_STEP_SUMMARY
-          find . -path "*/Coverage/*" -maxdepth 3 >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
-
       - name: Publish Test Results
         if: always() && steps.mode.outputs.run_tests == 'true'
         uses: dorny/test-reporter@main
@@ -397,26 +267,6 @@ jobs:
           name: unity-test-results
           path: coverage-artifact
 
-      - name: Debug - List coverage artifact contents
-        run: |
-          echo "### Coverage Artifact Contents" >> $GITHUB_STEP_SUMMARY
-          find coverage-artifact -type f -name "*.xml" -o -name "*.html" -o -name "*coverage*" >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
-          echo "### Coverage Directories" >> $GITHUB_STEP_SUMMARY
-          find coverage-artifact -type d -name "*Coverage*" >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
-
-      - name: Debug - Print sample file contents
-        run: |
-          COVERAGE_XML=$(find coverage-artifact -name "*.xml" -print -quit 2>/dev/null)
-          if [ -n "$COVERAGE_XML" ]; then
-            echo "### Sample Coverage XML (First 50 Lines)" >> $GITHUB_STEP_SUMMARY
-            head -n 50 "$COVERAGE_XML" >> $GITHUB_STEP_SUMMARY
-          fi
-          REPORT_INDEX=$(find coverage-artifact -name "index.html" -print -quit 2>/dev/null)
-          if [ -n "$REPORT_INDEX" ]; then
-            echo "### Coverage index.html (First 50 Lines)" >> $GITHUB_STEP_SUMMARY
-            head -n 50 "$REPORT_INDEX" >> $GITHUB_STEP_SUMMARY
-          fi
-
       - name: Try to locate coverage report path
         id: find_coverage
         run: |
@@ -433,18 +283,13 @@ jobs:
           REPORT_PATH=""
           for path in "${COVERAGE_PATHS[@]}"; do
             if [ -d "$path" ] && [ -n "$(find "$path" -name "*.html" -o -name "*.xml" -type f)" ]; then
-              echo "Found coverage report at: $path" >> $GITHUB_STEP_SUMMARY
               REPORT_PATH="$path"
               break
             fi
           done
           if [ -z "$REPORT_PATH" ]; then
-            echo "Could not find coverage report in expected locations" >> $GITHUB_STEP_SUMMARY
             REPORT_PATH=$(find coverage-artifact -type f -name "*.xml" -exec dirname {} \; | head -1 | uniq)
-            if [ -n "$REPORT_PATH" ]; then
-              echo "Fallback: Found XML files in: $REPORT_PATH" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "No coverage files found anywhere in artifact" >> $GITHUB_STEP_SUMMARY
+            if [ -z "$REPORT_PATH" ]; then
               exit 0
             fi
           fi
@@ -465,11 +310,8 @@ jobs:
       - name: Add link to summary
         if: always()
         run: |
-          echo "### Code Coverage Deployment" >> $GITHUB_STEP_SUMMARY
           if [ "${{ steps.deploy.outcome }}" == "success" ]; then
             echo "Latest report: ${{ steps.deploy.outputs.page_url }}" >> $GITHUB_STEP_SUMMARY
           else
-            echo "Failed to deploy coverage report. Check debug logs above." >> $GITHUB_STEP_SUMMARY
-            echo "Report path attempted: ${{ env.REPORT_PATH }}" >> $GITHUB_STEP_SUMMARY
-            echo "Ensure GitHub Pages is enabled in repository settings: https://github.com/Stormra1d/UnityExample/settings/pages" >> $GITHUB_STEP_SUMMARY
+            echo "Coverage report deploy failed. Path: ${{ env.REPORT_PATH }}" >> $GITHUB_STEP_SUMMARY
           fi
