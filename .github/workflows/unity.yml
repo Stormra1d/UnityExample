@@ -211,6 +211,22 @@ jobs:
             -v
             -logFile artifacts/playmode.log
 
+      - name: Generate HTML Coverage Report from XML
+        if: always() && steps.mode.outputs.run_tests == 'true'
+        run: |
+          echo "### Generating HTML Coverage Report" >> $GITHUB_STEP_SUMMARY
+          dotnet tool install -g dotnet-reportgenerator-globaltool
+          reportgenerator \
+            -reports:"${{ env.PROJECT_PATH }}/CodeCoverage/workspace-opencov/PlayMode/*.xml" \
+            -targetdir:"artifacts/CodeCoverage/ReportHtml" \
+            -reporttypes:HtmlInline_AzurePipelines
+          if [ -d "artifacts/CodeCoverage/ReportHtml" ]; then
+            echo "HTML report successfully generated." >> $GITHUB_STEP_SUMMARY
+            ls artifacts/CodeCoverage/ReportHtml >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ERROR: HTML report directory was not created." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
 
       - name: Copy Coverage Files to Artifacts
         if: always() && steps.mode.outputs.run_tests == 'true'
@@ -314,6 +330,7 @@ jobs:
           path: |
             artifacts/**/*.xml
             artifacts/**/*.log
+            artifacts/CodeCoverage/ReportHtml
             artifacts/performance/**/*.html
             artifacts/performance/**/*.json
             **/Logs/**
@@ -396,6 +413,7 @@ jobs:
         id: find_coverage
         run: |
           COVERAGE_PATHS=(
+            "coverage-artifact/artifacts/CodeCoverage/ReportHtml"
             "coverage-artifact/artifacts/CodeCoverage/Report"
             "coverage-artifact/CodeCoverage/workspace-opencov/PlayMode"
             "coverage-artifact/artifacts/CodeCoverage"
