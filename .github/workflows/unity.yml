@@ -146,7 +146,14 @@ jobs:
           githubToken: ${{ secrets.GITHUB_TOKEN }}
           testMode: PlayMode
           artifactsPath: artifacts
-          customParameters: -enableCodeCoverage -coverageResultsPath ./Coverage -coverageOptions enableCyclomaticComplexity;generateHtmlReport -testCategory "!SkipCI" -testResults artifacts/test-results.xml -performanceTestReportPath artifacts/performance/perf -enableProfiler
+          customParameters: >
+            -enableCodeCoverage
+            -coverageResultsPath ./Coverage
+            -coverageOptions enableCyclomaticComplexity;generateHtmlReport
+            -testCategory "!SkipCI"
+            -testResults artifacts/test-results.xml
+            -perfTestResults artifacts/performance/perf-results.json
+            -enableProfiler
 
       - name: List artifacts
         if: always()
